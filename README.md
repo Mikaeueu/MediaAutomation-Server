@@ -5,7 +5,7 @@ lives, integração com OBS, e gerenciamento remoto via celular.
 
 ------------------------------------------------------------------------
 
-## 🚀 Funcionalidades
+## 🚀 Objetivos
 
 -   🔐 Sistema de login simples
 -   📺 Controle do OBS via WebSocket
@@ -19,45 +19,4 @@ lives, integração com OBS, e gerenciamento remoto via celular.
 
 ------------------------------------------------------------------------
 
-## 🧠 Tecnologias utilizadas
 
--   Python
--   Flask
--   OBS WebSocket
--   HTML / CSS / JavaScript
--   Bootstrap
-
-------------------------------------------------------------------------
-
-## ⚙️ Instalação
-
-``` bash
-git clone https://github.com/seu-usuario/seu-projeto.git
-cd seu-projeto
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-------------------------------------------------------------------------
-
-## ▶️ Executando
-
-``` bash
-python run.py
-```
-
-Acesse: http://localhost:5000
-
-------------------------------------------------------------------------
-
-## 🔑 Login padrão
-
-Usuário: midiadm\
-Senha: 123321
-
-------------------------------------------------------------------------
-
-## 👨‍💻 Autor
-
-Mikael
