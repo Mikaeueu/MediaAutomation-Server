@@ -1,4 +1,4 @@
-# 🎛️ ChurchFlow
+# 🎛️ Media Automation SERVER
 
 Sistema de automação de mídia para igrejas, com foco no controle de
 lives, integração com OBS, e gerenciamento remoto via celular.
