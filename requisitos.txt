@@ -1,0 +1,24 @@
+*Aba para programar desligamento
+
+*aba para preenchimento de dados necessários do web socket do obs para controle do obs no servidor local web: Se for acessar pelo celular:
+
+Botão 1: Gerar live (automatizar live do youtube e facebook, titulo automatico e descriçào dependendo do dia da semana,
+o botão devolverá duas chaves de transmissão prontas, uma do facebook e outra do youtube)
+
+Botão 2: fazer um teste com a api do local host gerado pelo holyrics para automatizar 
+a troca de cena se o local host da biblia ou de letras de hino mudar (voltar para APENAS CAMERA LIVE após 10 segundos sem interação) (opçào de ativar e desativar em tempo real)
+
+sistema integrado em uma aba para gerar um servidor local que possa ser acessado em um celular para controlar diretamente o obs
+
+ws://IP_DO_PC:PORTA_OBS(padrão 4455) / sistema rodando em servidor local deverá ter um frontend adaptavel para celular com um login.
+
+*tela de login com usuario padrao (midiadm 123321)
+
+*iniciar com o computador
+
+*botão para abrir todos os programas que são utilizaveis
+
+
+
+
+
