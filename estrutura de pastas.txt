@@ -1,0 +1,39 @@
+meu_projeto/
+│
+├── app/
+│   ├── __init__.py          # cria o app Flask
+│   ├── config.py            # configs gerais
+│   │
+│   ├── routes/              # rotas separadas por função
+│   │   ├── auth_routes.py
+│   │   ├── obs_routes.py
+│   │   ├── live_routes.py
+│   │   ├── system_routes.py
+│   │
+│   ├── services/            # lógica (integrações, regras)
+│   │   ├── obs_service.py
+│   │   ├── youtube_service.py
+│   │   ├── facebook_service.py
+│   │   ├── holyrics_service.py
+│   │   ├── shutdown_service.py
+│   │
+│   ├── models/              # dados (mesmo que simples)
+│   │   ├── user_model.py
+│   │   ├── settings_model.py
+│   │
+│   ├── templates/           # HTML
+│   │   ├── login.html
+│   │   ├── dashboard.html
+│   │
+│   ├── static/              # css/js
+│   │   ├── css/
+│   │   ├── js/
+│   │
+│   ├── utils/               # helpers
+│   │   ├── auth.py
+│   │   ├── scheduler.py
+│   │
+│
+├── run.py                   # ponto de entrada
+├── requirements.txt
+├── .env                     # configs sensíveis
