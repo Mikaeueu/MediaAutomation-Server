@@ -1,0 +1,21 @@
+# frontend/Dockerfile.dev - ambiente de desenvolvimento com Vite
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Dependências do sistema (opcional)
+RUN apk add --no-cache bash
+
+# Copia package.json para aproveitar cache de camadas
+COPY frontend/package.json frontend/package-lock.json* ./
+
+# Instala dependências
+RUN npm ci
+
+# Copia o restante do código
+COPY frontend /app
+
+EXPOSE 5173
+
+# Rodar Vite em host 0.0.0.0 para acesso na rede local
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

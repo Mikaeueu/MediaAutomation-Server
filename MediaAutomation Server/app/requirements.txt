@@ -31,6 +31,17 @@ typing-extensions==4.8.0
 # Utilities and tooling
 python-dotenv==1.0.0
 
-# Development / testing (optional)
+# Logging / observability (recommended)
+loguru==0.7.0
+sentry-sdk==1.24.0
+
+# Production process manager (optional; útil se não usar uvicorn directly behind a process manager)
+gunicorn==20.1.0
+
+# Optional DB / migrations (only if you plan to persist data)
+SQLAlchemy==2.1.0
+alembic==1.11.1
+
+# Development / testing (kept here for convenience; consider moving to requirements-dev.txt)
 pytest==7.4.0
 pytest-asyncio==0.22.0
