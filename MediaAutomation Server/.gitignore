@@ -75,6 +75,7 @@ logs/
 *.log
 
 # Secrets, keys and local encrypted stores
+secrets/
 keys.enc
 *.key
 *.pem
@@ -82,14 +83,44 @@ keys.enc
 *.pfx
 secrets.json
 *.secret
-.env.* 
+*.enc
+*.crt
+*.jks
+*.keystore
+
+# Common credential files
+google_client_secrets.json
+credentials.json
+service_account.json
+oauth2.json
+
+# Environment files
+.env
+.env.*
 .env.local
+.env.*.local
 
 # Configs that may contain secrets or machine-specific settings
+/app/config.json
 config.json
 config/*.json
 instance/
 local_settings.py
+config/*.yml
+config/*.yaml
+
+# Filenames containing obvious secret words (catch-all patterns)
+*secret*
+*secrets*
+*credential*
+*credentials*
+*password*
+*passwd*
+*token*
+*apikey*
+*api_key*
+*private_key*
+*privatekey*
 
 # Frontend / Node
 node_modules/
