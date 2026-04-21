@@ -1,9 +1,7 @@
 """Scheduler helpers and safe job management.
 
-This module provides a singleton BackgroundScheduler instance and helper
-functions to schedule polling jobs, one-off jobs (e.g., shutdown), list
-and cancel jobs. It is designed to be safe for use across multiple modules
-without creating duplicate schedulers or conflicting job ids.
+This version avoids starting the scheduler at import time. Use start_scheduler()
+explicitly (e.g., in app startup) to initialize the singleton.
 """
 
 from datetime import datetime
@@ -19,11 +17,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.job import Job
 
-# Internal singleton scheduler and lock to avoid race conditions
 _scheduler_lock = threading.RLock()
 _scheduler_instance: Optional[BackgroundScheduler] = None
 
-# Prefixes for job ids to avoid collisions across the app
 _JOB_PREFIX_POLL = "poll-"
 _JOB_PREFIX_ONESHOT = "oneshot-"
 _JOB_PREFIX_SHUTDOWN = "shutdown-"
@@ -32,10 +28,7 @@ _JOB_PREFIX_SHUTDOWN = "shutdown-"
 def start_scheduler() -> BackgroundScheduler:
     """Start and return the singleton BackgroundScheduler.
 
-    If the scheduler is already started, return the existing instance.
-
-    Returns:
-        BackgroundScheduler: started scheduler instance.
+    Safe to call multiple times; returns existing instance if already started.
     """
     global _scheduler_instance
     with _scheduler_lock:
@@ -46,14 +39,7 @@ def start_scheduler() -> BackgroundScheduler:
 
 
 def get_scheduler() -> BackgroundScheduler:
-    """Return the running scheduler instance.
-
-    Raises:
-        RuntimeError: If the scheduler has not been started yet.
-
-    Returns:
-        BackgroundScheduler: the scheduler instance.
-    """
+    """Return the running scheduler instance or raise if not started."""
     global _scheduler_instance
     with _scheduler_lock:
         if _scheduler_instance is None:
@@ -62,14 +48,7 @@ def get_scheduler() -> BackgroundScheduler:
 
 
 def _generate_job_id(prefix: str) -> str:
-    """Generate a unique job id with a stable prefix.
-
-    Args:
-        prefix: Prefix string to categorize job ids.
-
-    Returns:
-        str: Unique job id.
-    """
+    """Generate a unique job id with a stable prefix."""
     return f"{prefix}{uuid.uuid4().hex}"
 
 
@@ -81,28 +60,12 @@ def schedule_polling(
     args: Optional[List[Any]] = None,
     kwargs: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Schedule a recurring polling job.
-
-    If job_id is provided and a job with the same id exists, the job will be
-    replaced to avoid duplicate polling jobs.
-
-    Args:
-        func: Callable to execute periodically.
-        seconds: Interval in seconds between runs.
-        max_instances: Maximum concurrent instances of the job.
-        job_id: Optional explicit job id.
-        args: Optional positional args for the callable.
-        kwargs: Optional keyword args for the callable.
-
-    Returns:
-        str: The job id scheduled.
-    """
+    """Schedule a recurring polling job (idempotent if job_id provided)."""
     scheduler = start_scheduler()
     args = args or []
     kwargs = kwargs or {}
     job_id = job_id or _generate_job_id(_JOB_PREFIX_POLL)
     trigger = IntervalTrigger(seconds=seconds)
-    # replace_existing ensures idempotency when re-scheduling same job_id
     scheduler.add_job(func, trigger=trigger, id=job_id, replace_existing=True, max_instances=max_instances, args=args, kwargs=kwargs)
     return job_id
 
@@ -114,18 +77,7 @@ def schedule_oneshot(
     args: Optional[List[Any]] = None,
     kwargs: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Schedule a one-off job at a specific datetime.
-
-    Args:
-        run_time: Datetime (UTC) when the job should run.
-        func: Callable to execute.
-        job_id: Optional explicit job id.
-        args: Optional positional args.
-        kwargs: Optional keyword args.
-
-    Returns:
-        str: The job id scheduled.
-    """
+    """Schedule a one-off job at a specific datetime."""
     scheduler = start_scheduler()
     args = args or []
     kwargs = kwargs or {}
@@ -138,5 +90,54 @@ def schedule_oneshot(
 def schedule_shutdown_job(scheduler: Optional[BackgroundScheduler], run_time: datetime, dry_run: bool = True) -> str:
     """Schedule a one-off shutdown job.
 
-    This function is a convenience wrapper that schedules a job which will
-    execute a platform-appropriate shutdown command. It accepts an explicit
+    Accepts an explicit scheduler for testability; if None, uses singleton.
+    """
+    sched = scheduler or start_scheduler()
+    job_id = _generate_job_id(_JOB_PREFIX_SHUTDOWN)
+    trigger = DateTrigger(run_date=run_time)
+    sched.add_job(_execute_shutdown_job, trigger=trigger, id=job_id, replace_existing=False, args=[dry_run])
+    return job_id
+
+
+def _execute_shutdown_job(dry_run: bool = True) -> None:
+    """Job function that executes the shutdown command for the host OS."""
+    system = platform.system().lower()
+    if dry_run:
+        # Replace with proper logging in real app
+        print(f"[scheduler] DRY RUN: would execute shutdown on {system}")
+        return
+
+    if system == "windows":
+        cmd = "shutdown /s /t 0"
+    elif system in ("linux", "darwin"):
+        cmd = "shutdown -h now"
+    else:
+        print(f"[scheduler] Unsupported platform for shutdown: {system}")
+        return
+
+    args = shlex.split(cmd)
+    try:
+        subprocess.Popen(args, shell=False)
+    except Exception as exc:
+        print(f"[scheduler] Failed to execute shutdown command: {exc}")
+
+
+def cancel_job(job_id: str) -> bool:
+    """Cancel a scheduled job by id."""
+    scheduler = start_scheduler()
+    try:
+        scheduler.remove_job(job_id)
+        return True
+    except Exception:
+        return False
+
+
+def list_jobs() -> List[Dict[str, Optional[str]]]:
+    """Return a list of scheduled jobs with minimal metadata."""
+    scheduler = start_scheduler()
+    jobs: List[Job] = scheduler.get_jobs()
+    result: List[Dict[str, Optional[str]]] = []
+    for job in jobs:
+        next_run = job.next_run_time.isoformat() if job.next_run_time else None
+        result.append({"id": job.id, "next_run_time": next_run})
+    return result

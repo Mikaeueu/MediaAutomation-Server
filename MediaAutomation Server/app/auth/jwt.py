@@ -1,22 +1,27 @@
-"""JWT utilities and FastAPI dependency to protect routes."""
+"""JWT utilities and FastAPI dependency to protect routes.
+
+This module loads secrets lazily to avoid failing at import time if config.json
+is missing. Use get_current_user / get_current_active_user as dependencies.
+"""
 
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.config import get_config
 from .schemas import TokenData, User
 from .users import get_user
+from app.config import get_config
 
-# OAuth2 scheme expects tokenUrl to match the login route
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-# Load secret and algorithm from config
-_cfg = get_config()
-SECRET_KEY = _cfg.get("auth", {}).get("jwt_secret", "troque_esta_chave_segura")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours by default
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+
+def _get_secret() -> str:
+    """Lazily obtain JWT secret from config with a safe default."""
+    cfg = get_config()
+    return cfg.get("auth", {}).get("jwt_secret", "troque_esta_chave_segura")
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -32,7 +37,8 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    secret = _get_secret()
+    token = jwt.encode(to_encode, secret, algorithm=ALGORITHM)
     return token
 
 
@@ -48,8 +54,9 @@ def decode_access_token(token: str) -> TokenData:
     Raises:
         HTTPException: If token is invalid or expired.
     """
+    secret = _get_secret()
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, secret, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub")
         if username is None:
             raise HTTPException(
@@ -86,17 +93,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency that ensures the current user is active (not disabled).
-
-    Args:
-        current_user: User resolved by get_current_user.
-
-    Returns:
-        The same User if active.
-
-    Raises:
-        HTTPException: If user is disabled.
-    """
+    """Dependency that ensures the current user is active (not disabled)."""
     if current_user.disabled:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is disabled")
     return current_user

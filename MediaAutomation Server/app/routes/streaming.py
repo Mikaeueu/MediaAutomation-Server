@@ -1,21 +1,24 @@
-"""Streaming routes: gerar transmissões e registrar chaves.
+"""Streaming routes including YouTube OAuth endpoints.
 
 Endpoints:
-- POST /stream/generate : generate title/description and attempt to create FB live
-- POST /stream/keys     : register (store) youtube/facebook keys securely
+- POST /stream/generate        : generate title/description and attempt FB live creation
+- POST /stream/keys            : register (store) youtube/facebook keys securely
+- GET  /stream/youtube/auth    : return authorization URL for YouTube OAuth
+- GET  /stream/youtube/callback: callback to exchange code for tokens
+- POST /stream/youtube/revoke  : revoke stored YouTube tokens
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
-from app.services.youtube import gerar_titulo_e_descricao
+from app.services.youtube import gerar_titulo_e_descricao, YouTubeService
 from app.services.facebook import FacebookService
 from app.utils.secure_store import SecureStore
 from app.config import get_config
 from app.auth.jwt import get_current_active_user
 from app.auth.schemas import User
 
-router = APIRouter(tags=["streaming"])
+router = APIRouter()
 
 
 class GenerateResponse(BaseModel):
@@ -36,24 +39,25 @@ class KeysPayload(BaseModel):
 def generate_stream(current_user: User = Depends(get_current_active_user)):
     """Attempt to generate live streams for YouTube and Facebook.
 
-    This endpoint returns generated title/description and attempts to create
-    live entries via service clients. If API credentials are not configured,
-    it returns None for the corresponding key and the frontend should allow
-    manual paste.
-
-    Args:
-        current_user: Authenticated user (injected).
-
-    Returns:
-        GenerateResponse with keys (may be None) and metadata.
+    Returns generated title/description and attempts to create FB live if configured.
     """
     cfg = get_config()
     title, description = gerar_titulo_e_descricao()
     youtube_key = None
     facebook_key = None
 
-    # YouTube: placeholder - real implementation requires OAuth flow
-    # youtube_key = youtube_service.create_live(...)
+    # YouTube: if OAuth configured and credentials available, attempt creation
+    yt_cfg = cfg.get("youtube", {})
+    if yt_cfg.get("client_secrets_path"):
+        yt_service = YouTubeService(oauth_client_secrets=yt_cfg.get("client_secrets_path"),
+                                    store_path=cfg.get("secrets_file"))
+        try:
+            if yt_service.has_credentials():
+                # create_live_broadcast not implemented; placeholder for future
+                pass
+        except Exception:
+            # Do not fail the whole endpoint if YouTube creation fails
+            pass
 
     # Facebook: try to create live if page access token configured
     fb_cfg = cfg.get("facebook", {})
@@ -75,15 +79,7 @@ def generate_stream(current_user: User = Depends(get_current_active_user)):
 
 @router.post("/keys")
 def register_keys(payload: KeysPayload, current_user: User = Depends(get_current_active_user)):
-    """Register (store) stream keys securely.
-
-    Args:
-        payload: KeysPayload with optional youtube_key and facebook_key.
-        current_user: Authenticated user (injected).
-
-    Returns:
-        dict: status message.
-    """
+    """Register (store) stream keys securely."""
     cfg = get_config()
     store_path = cfg.get("secrets_file", "keys.enc")
     store = SecureStore(store_path)
@@ -92,3 +88,70 @@ def register_keys(payload: KeysPayload, current_user: User = Depends(get_current
     if payload.facebook_key:
         store.set("facebook_key", payload.facebook_key)
     return {"status": "saved"}
+
+
+# ---------------------------
+# YouTube OAuth endpoints
+# ---------------------------
+
+@router.get("/youtube/auth")
+def youtube_auth(redirect_uri: str = Query(..., description="Redirect URI registered in Google Cloud Console"),
+                 state: Optional[str] = None,
+                 current_user: User = Depends(get_current_active_user)):
+    """Return an authorization URL for the YouTube OAuth flow.
+
+    Args:
+        redirect_uri: Redirect URI that must match the one registered in Google Cloud Console.
+        state: Optional state for CSRF protection.
+    """
+    cfg = get_config()
+    yt_cfg = cfg.get("youtube", {})
+    client_secrets = yt_cfg.get("client_secrets_path")
+    if not client_secrets:
+        raise HTTPException(status_code=400, detail="YouTube client_secrets not configured")
+    # Lazy import to avoid hard dependency if google libs are missing
+    from app.services.youtube_oauth import YouTubeOAuthService, YouTubeOAuthError
+    oauth = YouTubeOAuthService(client_secrets_path=client_secrets, store_path=cfg.get("secrets_file"))
+    try:
+        url = oauth.get_authorization_url(redirect_uri=redirect_uri, state=state)
+        return {"authorization_url": url}
+    except YouTubeOAuthError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/youtube/callback")
+def youtube_callback(code: str = Query(...), redirect_uri: str = Query(...), state: Optional[str] = None,
+                     current_user: User = Depends(get_current_active_user)):
+    """Callback endpoint to exchange authorization code for tokens.
+
+    Args:
+        code: Authorization code returned by Google.
+        redirect_uri: Redirect URI used in the flow.
+        state: Optional state value.
+    """
+    cfg = get_config()
+    yt_cfg = cfg.get("youtube", {})
+    client_secrets = yt_cfg.get("client_secrets_path")
+    if not client_secrets:
+        raise HTTPException(status_code=400, detail="YouTube client_secrets not configured")
+    from app.services.youtube_oauth import YouTubeOAuthService, YouTubeOAuthError
+    oauth = YouTubeOAuthService(client_secrets_path=client_secrets, store_path=cfg.get("secrets_file"))
+    try:
+        token_data = oauth.exchange_code(code=code, redirect_uri=redirect_uri)
+        return {"status": "ok", "token_data": {"has_refresh": bool(token_data.get("refresh_token"))}}
+    except YouTubeOAuthError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/youtube/revoke")
+def youtube_revoke(current_user: User = Depends(get_current_active_user)):
+    """Revoke stored YouTube tokens and remove them from secure store."""
+    cfg = get_config()
+    yt_cfg = cfg.get("youtube", {})
+    client_secrets = yt_cfg.get("client_secrets_path")
+    if not client_secrets:
+        raise HTTPException(status_code=400, detail="YouTube client_secrets not configured")
+    from app.services.youtube_oauth import YouTubeOAuthService
+    oauth = YouTubeOAuthService(client_secrets_path=client_secrets, store_path=cfg.get("secrets_file"))
+    oauth.revoke()
+    return {"status": "revoked"}
