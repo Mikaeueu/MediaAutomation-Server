@@ -14,7 +14,7 @@ APScheduler==3.10.1
 httpx==0.24.1
 
 # OBS websocket client
-obs-websocket-py==0.5.4
+obs-websocket-py==0.5.3
 
 # Google OAuth / YouTube (optional; required for OAuth flow and API calls)
 google-auth==2.22.0
