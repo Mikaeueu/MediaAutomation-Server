@@ -1,9 +1,36 @@
+# Web framework and ASGI server
 fastapi==0.95.2
 uvicorn[standard]==0.22.0
-pydantic==1.10.11
+
+# Authentication / security
 python-jose==3.3.0
 passlib[bcrypt]==1.7.4
-obs-websocket-py==0.6.3
-httpx==0.24.1
-APScheduler==3.10.1
 python-multipart==0.0.6
+
+# Scheduling and background jobs
+APScheduler==3.10.1
+
+# HTTP clients
+httpx==0.24.1
+
+# OBS websocket client
+obs-websocket-py==0.5.4
+
+# Google OAuth / YouTube (optional; required for OAuth flow and API calls)
+google-auth==2.22.0
+google-auth-oauthlib==1.0.0
+google-api-python-client==2.86.0
+
+# Cryptography for SecureStore
+cryptography==41.0.3
+
+# Type / data validation
+pydantic==1.10.12
+typing-extensions==4.8.0
+
+# Utilities and tooling
+python-dotenv==1.0.0
+
+# Development / testing (optional)
+pytest==7.4.0
+pytest-asyncio==0.22.0
