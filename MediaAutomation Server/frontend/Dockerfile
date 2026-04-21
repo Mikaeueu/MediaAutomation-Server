@@ -1,23 +1,20 @@
-# frontend/Dockerfile - produção (multi-stage)
 FROM node:18-alpine AS build
 WORKDIR /app
 
-# Copia package.json e package-lock para cache
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --silent
+# copia package.json e package-lock para cache
+COPY frontend/package*.json ./
 
-# Copia o código e gera build
-COPY frontend /app
+# instala dependências
+RUN if [ -f package-lock.json ]; then npm ci --silent --prefer-offline; else npm install --silent --prefer-offline; fi
+
+# copia todo o frontend (inclui src/index.html)
+COPY frontend/ ./
+
+# roda build (Vite usará root: "src" conforme vite.config.ts)
 RUN npm run build
 
-# Stage runtime com nginx
 FROM nginx:stable-alpine AS runtime
-# Remove default index (opcional) e copia build
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist /usr/share/nginx/html
-
-# Opcional: adicionar configuração nginx customizada
-# COPY deploy/nginx.conf /etc/nginx/nginx.conf
-
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
