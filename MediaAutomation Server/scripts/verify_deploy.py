@@ -55,10 +55,15 @@ def read_requirements(path: Path):
             ln = ln.strip()
             if not ln or ln.startswith("#"):
                 continue
-            # remove extras like ==version or >=
+            # remove version specifiers and extras like [standard]
             pkg = ln.split("==")[0].split(">=")[0].split("<=")[0].split()[0]
+            # normalize: remove extras in square brackets, e.g., uvicorn[standard] -> uvicorn
+            if "[" in pkg and "]" in pkg:
+                pkg = pkg.split("[", 1)[0]
+            pkg = pkg.lower()
             lines.append(pkg)
     return set(lines)
+
 
 def main():
     critical = False
