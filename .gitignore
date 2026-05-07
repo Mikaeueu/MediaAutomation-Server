@@ -55,3 +55,6 @@ desktop.ini
 ### --- LOGS ---
 *.log
 logs/
+
+### --- MISC ---
+.packaging/
