@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Login | MediaAutomationServer{% endblock %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-950 via-slate-900 to-brand-700/30">
+  <div x-data="loginForm()" class="w-full max-w-md">
+    <div class="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl shadow-2xl p-8">
+      <div class="text-center mb-8">
+        <div class="mx-auto w-14 h-14 rounded-2xl bg-brand-500/20 flex items-center justify-center mb-4">
+          <span class="text-2xl">🎬</span>
+        </div>
+        <h1 class="text-2xl font-semibold tracking-tight">MediaAutomationServer</h1>
+        <p class="text-sm text-slate-400 mt-1">Central de transmissao da equipe de midia</p>
+      </div>
+
+      <form @submit.prevent="submit" class="space-y-4">
+        <div>
+          <label class="block text-sm text-slate-300 mb-1.5" for="username">Usuario</label>
+          <input id="username" x-model="username" type="text" required autocomplete="username"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-300 mb-1.5" for="password">Senha</label>
+          <input id="password" x-model="password" type="password" required autocomplete="current-password"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition" />
+        </div>
+
+        <p x-show="error" x-cloak x-text="error" class="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2"></p>
+
+        <button type="submit" :disabled="loading"
+          class="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition rounded-lg py-2.5 font-medium shadow-lg shadow-brand-500/20">
+          <span x-show="!loading">Entrar</span>
+          <span x-show="loading" x-cloak>Autenticando...</span>
+        </button>
+      </form>
+    </div>
+    <p class="text-center text-xs text-slate-500 mt-6">v0.1.0 - feito para sua equipe de midia</p>
+  </div>
+</main>
+
+<script>
+/**
+ * Componente Alpine para o formulario de login.
+ *
+ * @returns objeto reativo com username, password, loading e error.
+ */
+function loginForm() {
+  return {
+    username: '',
+    password: '',
+    loading: false,
+    error: '',
+
+    async submit() {
+      this.loading = true;
+      this.error = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: this.username, password: this.password }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          this.error = data.detail || 'Falha ao autenticar.';
+          return;
+        }
+        const params = new URLSearchParams(window.location.search);
+        window.location.href = params.get('next') || '/';
+      } catch (e) {
+        this.error = 'Erro de conexao com o servidor.';
+      } finally {
+        this.loading = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}
