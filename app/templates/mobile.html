@@ -1,0 +1,606 @@
+{% extends "base.html" %} {% block title %}Painel Mobile | MediaServer{%
+endblock %} {% block body %}
+
+<script>
+  window.__APP_INITIAL = {
+    network: {{ network | tojson }},
+    username: {{ username | tojson }}
+  };
+</script>
+
+<div
+  x-data="mobileApp()"
+  x-init="init()"
+  class="min-h-screen bg-slate-950 text-slate-100 pb-24"
+>
+  <header
+    class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between"
+  >
+    <div class="flex items-center gap-2">
+      <div
+        class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="2"
+          stroke="currentColor"
+          class="w-4 h-4 text-white"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"
+          />
+        </svg>
+      </div>
+      <div>
+        <p class="font-semibold leading-tight text-sm">MediaServer</p>
+        <p class="text-[10px] text-slate-400">{{ username }}</p>
+      </div>
+    </div>
+    <button
+      @click="logout"
+      class="text-xs text-slate-400 hover:text-slate-100 px-2 py-1"
+    >
+      Sair
+    </button>
+  </header>
+
+  <main class="px-4 py-4 space-y-4 max-w-xl mx-auto">
+    <!-- Status compacto OBS -->
+    <section
+      class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <span
+          class="w-2.5 h-2.5 rounded-full shrink-0"
+          :class="obsStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"
+        ></span>
+        <div class="min-w-0">
+          <p class="text-xs text-slate-400">Cena ativa</p>
+          <p
+            class="text-sm font-semibold truncate"
+            x-text="obsStatus.current_scene || (obsStatus.connected ? '-' : 'OBS desconectado')"
+          ></p>
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <p class="text-xs text-slate-400">Gravacao</p>
+        <p
+          class="text-sm font-mono font-semibold"
+          :class="obsStatus.recording && obsStatus.recording.active ? 'text-red-400' : 'text-slate-400'"
+          x-text="obsStatus.recording && obsStatus.recording.active ? (obsStatus.recording.timecode || '00:00:00') : 'parada'"
+        ></p>
+      </div>
+    </section>
+
+    <!-- Tabs (3 abas: Cenas / Audio / Versos) -->
+    <nav
+      class="flex gap-1 p-1 bg-slate-900/60 border border-slate-800 rounded-xl"
+    >
+      <button
+        @click="tab = 'scenes'"
+        :class="tab === 'scenes' ? 'bg-brand-500/20 text-brand-50' : 'text-slate-400'"
+        class="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.8"
+          stroke="currentColor"
+          class="w-4 h-4"
+        >
+          <rect
+            x="3"
+            y="5"
+            width="18"
+            height="14"
+            rx="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        Cenas
+      </button>
+      <button
+        @click="tab = 'audio'; obsLoadAudioInputs()"
+        :class="tab === 'audio' ? 'bg-brand-500/20 text-brand-50' : 'text-slate-400'"
+        class="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.8"
+          stroke="currentColor"
+          class="w-4 h-4"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z"
+          />
+        </svg>
+        Audio
+      </button>
+      <button
+        @click="tab = 'verses'; holyLoad()"
+        :class="tab === 'verses' ? 'bg-brand-500/20 text-brand-50' : 'text-slate-400'"
+        class="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.8"
+          stroke="currentColor"
+          class="w-4 h-4"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"
+          />
+        </svg>
+        Versos
+      </button>
+    </nav>
+
+    <!-- ===================== Aba Cenas ===================== -->
+    <section x-show="tab === 'scenes'" x-cloak class="space-y-3">
+      <div
+        x-show="!obsStatus.connected"
+        x-cloak
+        class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center"
+      >
+        <p class="text-sm font-medium text-red-400">OBS desconectado</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          @click="obsHotkey('OBS_KEY_F1')"
+          :disabled="!obsStatus.connected"
+          class="bg-slate-900/60 hover:bg-slate-800 active:scale-[0.97] border border-slate-800 rounded-xl py-4 disabled:opacity-50 transition flex flex-col items-center gap-1"
+        >
+          <span class="font-mono font-bold text-2xl text-brand-400">F1</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wide"
+            >Atalho</span
+          >
+        </button>
+        <button
+          @click="obsHotkey('OBS_KEY_F3')"
+          :disabled="!obsStatus.connected"
+          class="bg-slate-900/60 hover:bg-slate-800 active:scale-[0.97] border border-slate-800 rounded-xl py-4 disabled:opacity-50 transition flex flex-col items-center gap-1"
+        >
+          <span class="font-mono font-bold text-2xl text-brand-400">F3</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wide"
+            >Atalho</span
+          >
+        </button>
+      </div>
+      <button
+        @click="obsToggleRecording"
+        :disabled="!obsStatus.connected"
+        :class="obsStatus.recording && obsStatus.recording.active ? 'bg-slate-700' : 'bg-red-500'"
+        class="w-full disabled:opacity-50 transition rounded-xl py-3 font-semibold text-white shadow-lg flex items-center justify-center gap-2"
+      >
+        <span
+          x-text="obsStatus.recording && obsStatus.recording.active ? 'Parar gravacao' : 'Iniciar gravacao'"
+        ></span>
+      </button>
+      <div class="space-y-2" x-show="obsStatus.connected" x-cloak>
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400 uppercase tracking-wide">
+            Toque para trocar
+          </p>
+          <button @click="obsLoadScenes" class="text-xs text-slate-500">
+            Atualizar
+          </button>
+        </div>
+        <template x-for="s in scenes" :key="s.name">
+          <button
+            @click="!s.hidden && obsSwitchScene(s.name)"
+            :disabled="s.hidden || s.name === obsStatus.current_scene"
+            :class="s.hidden ? 'border-slate-800 bg-slate-900/40 opacity-50 cursor-not-allowed' : (s.name === obsStatus.current_scene ? 'border-brand-500 bg-brand-500/15 ring-2 ring-brand-500/30' : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800 active:scale-[0.98]')"
+            class="w-full border rounded-xl px-4 py-4 transition text-left flex items-center justify-between gap-2"
+          >
+            <span
+              class="font-semibold truncate"
+              :class="s.hidden ? 'line-through text-slate-500' : ''"
+              x-text="s.name"
+            ></span>
+            <span
+              x-show="s.name === obsStatus.current_scene && !s.hidden"
+              x-cloak
+              class="text-[10px] bg-brand-500 text-white px-2 py-0.5 rounded-full font-bold"
+              >ATIVA</span
+            >
+            <span
+              x-show="s.hidden"
+              x-cloak
+              class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-bold"
+              >OCULTA</span
+            >
+          </button>
+        </template>
+      </div>
+    </section>
+
+    <!-- ===================== Aba Audio ===================== -->
+    <section x-show="tab === 'audio'" x-cloak class="space-y-3">
+      <div
+        x-show="!obsStatus.connected"
+        x-cloak
+        class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center"
+      >
+        <p class="text-sm font-medium text-red-400">OBS desconectado</p>
+      </div>
+      <div
+        x-show="obsStatus.connected"
+        x-cloak
+        class="flex items-center justify-between"
+      >
+        <p class="text-xs text-slate-400 uppercase tracking-wide">Volumes</p>
+        <button @click="obsLoadAudioInputs" class="text-xs text-slate-500">
+          Atualizar
+        </button>
+      </div>
+      <template x-for="inp in audioInputs" :key="inp.name">
+        <div
+          class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-2"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <p
+              class="font-semibold truncate"
+              :class="inp.muted ? 'text-slate-500 line-through' : ''"
+              x-text="inp.name"
+            ></p>
+            <button
+              @click="obsMute(inp.name)"
+              :class="inp.muted ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'"
+              class="text-xs border px-2.5 py-1 rounded-md font-medium"
+            >
+              <span x-text="inp.muted ? 'MUTADO' : 'Mudo'"></span>
+            </button>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            x-model.number="inp.volume_mul"
+            @input="obsSetVolume(inp.name, $event.target.value)"
+            class="w-full accent-brand-500"
+            :disabled="inp.muted"
+          />
+          <div
+            class="flex items-center justify-between text-xs text-slate-500 font-mono"
+          >
+            <span x-text="Math.round(inp.volume_mul * 100) + '%'"></span>
+            <span x-text="inp.volume_db.toFixed(1) + ' dB'"></span>
+          </div>
+        </div>
+      </template>
+      <p
+        x-show="obsStatus.connected && audioInputs.length === 0"
+        x-cloak
+        class="text-sm text-slate-500 text-center py-8"
+      >
+        Nenhum input de audio detectado.
+      </p>
+    </section>
+
+    <!-- ===================== Aba Versos (Holyrics) ===================== -->
+    <section x-show="tab === 'verses'" x-cloak class="space-y-3">
+      <!-- Banner se nao configurado -->
+      <div
+        x-show="!holy.config.is_configured"
+        x-cloak
+        class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center"
+      >
+        <p class="text-sm font-medium text-amber-400">
+          Holyrics nao configurado
+        </p>
+        <p class="text-xs text-slate-400 mt-1">
+          Toque na engrenagem pra adicionar host, porta e token.
+        </p>
+      </div>
+
+      <div
+        x-show="holy.config.is_configured"
+        x-cloak
+        class="flex items-center justify-between gap-2"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <span
+            class="w-2 h-2 rounded-full shrink-0"
+            :class="holy.status.connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"
+          ></span>
+          <p
+            class="text-xs text-slate-400 truncate"
+            x-text="holy.status.connected ? 'Holyrics conectado' : 'Sem conexao com Holyrics'"
+          ></p>
+        </div>
+        <button
+          @click="holy.showConfig = true"
+          class="text-xs text-slate-500 hover:text-slate-300 px-2 py-1"
+        >
+          Configurar
+        </button>
+      </div>
+
+      <!-- Form do versiculo -->
+      <div
+        x-show="holy.config.is_configured"
+        x-cloak
+        class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3"
+      >
+        <div>
+          <label class="text-xs text-slate-400 uppercase tracking-wide"
+            >Versao</label
+          >
+          <select
+            x-model="holy.form.version"
+            class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 mt-1 text-base"
+          >
+            <template x-for="v in holy.versions" :key="v.abbrev">
+              <option
+                :value="v.abbrev"
+                x-text="(v.abbrev || '').toUpperCase() + ' - ' + v.name"
+              ></option>
+            </template>
+            <option x-show="holy.versions.length === 0" value="rc">
+              RC (default)
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 uppercase tracking-wide"
+            >Livro</label
+          >
+          <div class="space-y-2">
+            <input
+              type="text"
+              x-model="holy.bookSearch"
+              @input="filterBooks()"
+              placeholder="Pesquisar livro..."
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            />
+            <div
+              class="max-h-48 overflow-y-auto rounded-lg border border-slate-700"
+            >
+            <template x-for="(book, index) in holy.filteredBooks" :key="book.name">
+              <button 
+                type="button"
+                @click="
+                  holy.form.book = book.abbr; 
+                  holy.bookSearch = book.name; 
+                  holy.filteredBooks = [];
+                  updateChapters();
+                "
+                class="w-full text-left px-3 py-2 hover:bg-slate-800"
+              >
+                <span x-text="book.name"></span>
+              </button>
+            </template>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <select
+              x-model="holy.form.chapter"
+              @change="updateVerses()"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            >
+              <option value="">Capítulo</option>
+              <template x-for="chapter in holy.availableChapters" :key="chapter">
+                <option :value="chapter" x-text="chapter"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <select
+              x-model="holy.form.verse"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            >
+              <option value="">Versículo</option>
+              <template x-for="verse in holy.availableVerses" :key="verse">
+                <option :value="verse" x-text="verse"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+        <p
+          x-show="holy.error"
+          x-cloak
+          x-text="holy.error"
+          class="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5"
+        ></p>
+        <button
+          @click="holyShowVerse"
+          :disabled="!holy.form.version || !holy.form.book || !holy.form.chapter || !holy.form.verse"
+          class="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition rounded-lg py-3 font-semibold text-white"
+        >
+          Mostrar no Holyrics
+        </button>
+      </div>
+
+      <!-- Botao esconder -->
+      <button
+        x-show="holy.config.is_configured"
+        x-cloak
+        @click="holyClose"
+        class="w-full bg-red-500 hover:bg-red-600 transition rounded-xl py-3 font-semibold text-white shadow-lg"
+      >
+        Esconder projecao
+      </button>
+
+      <!-- Historico -->
+      <div
+        x-show="holy.config.is_configured && holy.recent.length > 0"
+        x-cloak
+        class="space-y-2"
+      >
+        <p class="text-xs text-slate-400 uppercase tracking-wide">Recentes</p>
+        <template x-for="r in holy.recent" :key="r.id">
+          <button
+            @click="holyRepeat(r)"
+            class="w-full text-left bg-slate-900/60 hover:bg-slate-800 active:scale-[0.98] border border-slate-800 rounded-lg px-4 py-2.5 transition"
+          >
+            <p class="text-sm font-medium truncate" x-text="r.label"></p>
+          </button>
+        </template>
+      </div>
+
+      <!-- Modal de configuracao -->
+      <div
+        x-show="holy.showConfig"
+        x-cloak
+        class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+      >
+        <div
+          class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-3"
+        >
+          <h2 class="font-semibold text-base">Configuracao Holyrics</h2>
+          <div>
+            <label class="text-xs text-slate-400">Host</label>
+            <input
+              x-model="holy.configForm.host"
+              placeholder="localhost"
+              class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 mt-1"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Porta</label>
+            <input
+              type="number"
+              x-model.number="holy.configForm.port"
+              min="1"
+              max="65535"
+              class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 mt-1"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Token de API</label>
+            <input
+              :type="holy.showToken ? 'text' : 'password'"
+              x-model="holy.configForm.token"
+              class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 mt-1 font-mono"
+            />
+            <label class="flex items-center gap-2 mt-2 text-xs text-slate-400"
+              ><input type="checkbox" x-model="holy.showToken" /> Mostrar
+              token</label
+            >
+          </div>
+          <p
+            x-show="holy.testMessage"
+            x-cloak
+            x-text="holy.testMessage"
+            :class="holy.testOk ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-red-400 bg-red-500/10 border-red-500/30'"
+            class="text-xs border rounded px-2 py-1.5"
+          ></p>
+          <p
+            class="text-xs text-slate-500 bg-slate-800/40 border border-slate-800 rounded p-2.5 leading-relaxed"
+          >
+            <span class="block"
+              >Como obter: Holyrics > Configuracoes > API Server > Habilitar >
+              copiar Token.</span
+            >
+            <span class="block mt-1.5 text-amber-400/90"
+              >Em <b>Permissoes</b>, marque:
+              <code class="text-emerald-400">GetCPInfo</code>,
+              <code class="text-emerald-400">SetVerse</code>,
+              <code class="text-emerald-400">CloseTextCPS</code>,
+              <code class="text-emerald-400">GetBibleVersions</code>.</span
+            >
+          </p>
+          <div class="flex gap-2">
+            <button
+              @click="holyTestConfig"
+              class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg py-2 text-sm"
+            >
+              Testar
+            </button>
+            <button
+              @click="holySaveConfig"
+              class="flex-1 bg-brand-500 hover:bg-brand-600 rounded-lg py-2 text-sm"
+            >
+              Salvar
+            </button>
+          </div>
+          <button
+            @click="holy.showConfig = false"
+            class="w-full text-sm text-slate-400 py-2"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal de aviso pre-shutdown -->
+  <div
+    x-show="warning.visible"
+    x-cloak
+    class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+  >
+    <div
+      class="bg-slate-900 border-2 rounded-2xl w-full max-w-md p-5"
+      :class="warning.action === 'shutdown' ? 'border-red-500' : 'border-indigo-500'"
+    >
+      <div class="text-center mb-4">
+        <p
+          class="text-sm uppercase tracking-wide font-bold"
+          :class="warning.action === 'shutdown' ? 'text-red-400' : 'text-indigo-400'"
+        >
+          Atencao
+        </p>
+        <p class="text-sm text-slate-300 mt-1">
+          O PC vai
+          <span
+            class="font-bold"
+            x-text="warning.action === 'shutdown' ? 'DESLIGAR' : 'SUSPENDER'"
+          ></span>
+          em
+        </p>
+        <p
+          class="font-mono text-3xl font-bold mt-1"
+          :class="warning.action === 'shutdown' ? 'text-red-400' : 'text-indigo-400'"
+          x-text="warning.countdown"
+        ></p>
+      </div>
+      <div class="space-y-2">
+        <button
+          @click="postponeWarning(30)"
+          class="w-full bg-amber-500 hover:bg-amber-600 rounded-lg py-2.5 font-semibold text-sm text-white"
+        >
+          Adiar 30 min
+        </button>
+        <button
+          @click="cancelWarning"
+          class="w-full bg-slate-700 hover:bg-slate-600 rounded-lg py-2.5 font-medium text-sm"
+        >
+          Cancelar agendamento
+        </button>
+        <button
+          @click="dismissWarning"
+          class="w-full text-xs text-slate-400 py-2"
+        >
+          Manter
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
+<script src="/static/js/mobile.js"></script>
+{% endblock %}

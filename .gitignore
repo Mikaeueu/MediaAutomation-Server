@@ -1,0 +1,60 @@
+### --- PYTHON ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+### --- NODE / FRONTEND ---
+node_modules/
+dist/
+build/
+.cache/
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+### --- DATABASE / DATA ---
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+*.sqlite
+
+### --- CONFIG / SECRETS ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+### --- DOCKER ---
+.docker/
+# Ignora arquivos de log do docker se necessário
+core.[0-9]*
+
+### --- IDEs / EDITORS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+### --- OS / SYSTEM ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### --- LOGS ---
+*.log
+logs/
+
+### --- MISC ---
+.packaging/
