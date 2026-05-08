@@ -5785,6 +5785,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#app.core.dependencies">app.core.dependencies</a>
+ &#8226;   <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
  &#8226;   <a href="#app.core.security">app.core.security</a>
 
   </div>
@@ -5811,6 +5812,26 @@ imported by:
  &#8226;   <a href="#app.routers.service_types">app.routers.service_types</a>
  &#8226;   <a href="#app.routers.shutdown">app.routers.shutdown</a>
  &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="app.core.holyrics_store"></a>
+  <a target="code" href="///E:/%27projetos/adm%20multimidia/app/core/holyrics_store.py" type="text/plain"><tt>app.core.holyrics_store</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#app.core">app.core</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#typing">typing</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#app.routers.holyrics">app.routers.holyrics</a>
+ &#8226;   <a href="#app.services.holyrics_service">app.services.holyrics_service</a>
 
   </div>
 
@@ -5857,7 +5878,6 @@ imports:
 imported by:
     <a href="#app.main">app.main</a>
  &#8226;   <a href="#app.repositories.hidden_scenes_repository">app.repositories.hidden_scenes_repository</a>
- &#8226;   <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
  &#8226;   <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
  &#8226;   <a href="#app.repositories.service_type_repository">app.repositories.service_type_repository</a>
  &#8226;   <a href="#app.repositories.shutdown_schedule_repository">app.repositories.shutdown_schedule_repository</a>
@@ -5916,7 +5936,6 @@ imports:
   <div class="import">
 imported by:
     <a href="#app.models.base">app.models.base</a>
- &#8226;   <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
  &#8226;   <a href="#app.models.obs_config">app.models.obs_config</a>
  &#8226;   <a href="#app.models.service_type">app.models.service_type</a>
  &#8226;   <a href="#app.models.shutdown_schedule">app.models.shutdown_schedule</a>
@@ -5939,31 +5958,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
- &#8226;   <a href="#app.models.obs_config">app.models.obs_config</a>
+    <a href="#app.models.obs_config">app.models.obs_config</a>
  &#8226;   <a href="#app.models.service_type">app.models.service_type</a>
  &#8226;   <a href="#app.models.shutdown_schedule">app.models.shutdown_schedule</a>
  &#8226;   <a href="#app.models.user">app.models.user</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="app.models.holyrics_config"></a>
-  <a target="code" href="///E:/%27projetos/adm%20multimidia/app/models/holyrics_config.py" type="text/plain"><tt>app.models.holyrics_config</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#app.models">app.models</a>
- &#8226;   <a href="#app.models.base">app.models.base</a>
- &#8226;   <a href="#dataclasses">dataclasses</a>
- &#8226;   <a href="#datetime">datetime</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
- &#8226;   <a href="#app.routers.holyrics">app.routers.holyrics</a>
 
   </div>
 
@@ -6062,7 +6060,6 @@ imports:
 imported by:
     <a href="#app.repositories.base">app.repositories.base</a>
  &#8226;   <a href="#app.repositories.hidden_scenes_repository">app.repositories.hidden_scenes_repository</a>
- &#8226;   <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
  &#8226;   <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
  &#8226;   <a href="#app.repositories.service_type_repository">app.repositories.service_type_repository</a>
  &#8226;   <a href="#app.repositories.shutdown_schedule_repository">app.repositories.shutdown_schedule_repository</a>
@@ -6105,27 +6102,6 @@ imports:
 imported by:
     <a href="#app.routers.obs">app.routers.obs</a>
  &#8226;   <a href="#app.services.obs_service">app.services.obs_service</a>
-
-  </div>
-
-</div>
-
-<div class="node">
-  <a name="app.repositories.holyrics_config_repository"></a>
-  <a target="code" href="///E:/%27projetos/adm%20multimidia/app/repositories/holyrics_config_repository.py" type="text/plain"><tt>app.repositories.holyrics_config_repository</tt></a>
-<span class="moduletype">SourceModule</span>  <div class="import">
-imports:
-    <a href="#app.database">app.database</a>
- &#8226;   <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
- &#8226;   <a href="#app.repositories">app.repositories</a>
- &#8226;   <a href="#datetime">datetime</a>
- &#8226;   <a href="#sqlite3">sqlite3</a>
- &#8226;   <a href="#sqlite3.Row">sqlite3.Row</a>
-
-  </div>
-  <div class="import">
-imported by:
-    <a href="#app.routers.holyrics">app.routers.holyrics</a>
 
   </div>
 
@@ -6280,8 +6256,7 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#app.core.dependencies">app.core.dependencies</a>
- &#8226;   <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
- &#8226;   <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
+ &#8226;   <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
  &#8226;   <a href="#app.routers">app.routers</a>
  &#8226;   <a href="#app.schemas.holyrics_config">app.schemas.holyrics_config</a>
  &#8226;   <a href="#app.services.holyrics_service">app.services.holyrics_service</a>
@@ -6482,6 +6457,7 @@ imports:
  &#8226;   <a href="#datetime">datetime</a>
  &#8226;   <a href="#pydantic">pydantic</a>
  &#8226;   <a href="#pydantic.BaseModel">pydantic.BaseModel</a>
+ &#8226;   <a href="#typing">typing</a>
 
   </div>
   <div class="import">
@@ -6596,9 +6572,11 @@ imported by:
 <div class="node">
   <a name="app.services.holyrics_service"></a>
   <a target="code" href="///E:/%27projetos/adm%20multimidia/app/services/holyrics_service.py" type="text/plain"><tt>app.services.holyrics_service</tt></a>
-<span class="moduletype">InvalidSourceModule</span>  <div class="import">
+<span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#app.services">app.services</a>
+    <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
+ &#8226;   <a href="#app.services">app.services</a>
+ &#8226;   <a href="#httpx">httpx</a>
 
   </div>
   <div class="import">
@@ -11707,7 +11685,6 @@ imported by:
  &#8226;   <a href="#anyio.streams.text">anyio.streams.text</a>
  &#8226;   <a href="#anyio.streams.tls">anyio.streams.tls</a>
  &#8226;   <a href="#app.models.base">app.models.base</a>
- &#8226;   <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
  &#8226;   <a href="#app.models.obs_config">app.models.obs_config</a>
  &#8226;   <a href="#app.models.service_type">app.models.service_type</a>
  &#8226;   <a href="#app.models.shutdown_schedule">app.models.shutdown_schedule</a>
@@ -11777,12 +11754,10 @@ imported by:
  &#8226;   <a href="#annotated_types">annotated_types</a>
  &#8226;   <a href="#app.core.security">app.core.security</a>
  &#8226;   <a href="#app.models.base">app.models.base</a>
- &#8226;   <a href="#app.models.holyrics_config">app.models.holyrics_config</a>
  &#8226;   <a href="#app.models.obs_config">app.models.obs_config</a>
  &#8226;   <a href="#app.models.service_type">app.models.service_type</a>
  &#8226;   <a href="#app.models.shutdown_schedule">app.models.shutdown_schedule</a>
  &#8226;   <a href="#app.models.user">app.models.user</a>
- &#8226;   <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
  &#8226;   <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
  &#8226;   <a href="#app.repositories.service_type_repository">app.repositories.service_type_repository</a>
  &#8226;   <a href="#app.repositories.shutdown_schedule_repository">app.repositories.shutdown_schedule_repository</a>
@@ -19203,7 +19178,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#httpx.__version__">httpx.__version__</a>
+    <a href="#app.services.holyrics_service">app.services.holyrics_service</a>
+ &#8226;   <a href="#httpx.__version__">httpx.__version__</a>
  &#8226;   <a href="#httpx._api">httpx._api</a>
  &#8226;   <a href="#httpx._auth">httpx._auth</a>
  &#8226;   <a href="#httpx._client">httpx._client</a>
@@ -22106,7 +22082,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.routers.holyrics">app.routers.holyrics</a>
+    <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
+ &#8226;   <a href="#app.routers.holyrics">app.routers.holyrics</a>
  &#8226;   <a href="#ecdsa._version">ecdsa._version</a>
  &#8226;   <a href="#fastapi.openapi.docs">fastapi.openapi.docs</a>
  &#8226;   <a href="#fastapi.routing">fastapi.routing</a>
@@ -24700,6 +24677,7 @@ imported by:
  &#8226;   <a href="#anyio._core._fileio">anyio._core._fileio</a>
  &#8226;   <a href="#anyio.streams.file">anyio.streams.file</a>
  &#8226;   <a href="#app.config">app.config</a>
+ &#8226;   <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
  &#8226;   <a href="#click._termui_impl">click._termui_impl</a>
  &#8226;   <a href="#dotenv.main">dotenv.main</a>
  &#8226;   <a href="#fastapi.encoders">fastapi.encoders</a>
@@ -36018,7 +35996,6 @@ imports:
   <div class="import">
 imported by:
     <a href="#app.database">app.database</a>
- &#8226;   <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
  &#8226;   <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
  &#8226;   <a href="#app.repositories.service_type_repository">app.repositories.service_type_repository</a>
  &#8226;   <a href="#app.repositories.shutdown_schedule_repository">app.repositories.shutdown_schedule_repository</a>
@@ -36038,8 +36015,7 @@ imported by:
   <a target="code" href="" type="text/plain"><tt>sqlite3.Row</tt></a>
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
-    <a href="#app.repositories.holyrics_config_repository">app.repositories.holyrics_config_repository</a>
- &#8226;   <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
+    <a href="#app.repositories.obs_config_repository">app.repositories.obs_config_repository</a>
  &#8226;   <a href="#app.repositories.service_type_repository">app.repositories.service_type_repository</a>
  &#8226;   <a href="#app.repositories.shutdown_schedule_repository">app.repositories.shutdown_schedule_repository</a>
  &#8226;   <a href="#app.repositories.user_repository">app.repositories.user_repository</a>
@@ -38792,11 +38768,13 @@ imported by:
  &#8226;   <a href="#anyio.to_interpreter">anyio.to_interpreter</a>
  &#8226;   <a href="#anyio.to_process">anyio.to_process</a>
  &#8226;   <a href="#anyio.to_thread">anyio.to_thread</a>
+ &#8226;   <a href="#app.core.holyrics_store">app.core.holyrics_store</a>
  &#8226;   <a href="#app.core.security">app.core.security</a>
  &#8226;   <a href="#app.database">app.database</a>
  &#8226;   <a href="#app.main">app.main</a>
  &#8226;   <a href="#app.models.base">app.models.base</a>
  &#8226;   <a href="#app.repositories.base">app.repositories.base</a>
+ &#8226;   <a href="#app.schemas.holyrics_config">app.schemas.holyrics_config</a>
  &#8226;   <a href="#app.schemas.shutdown_schedule">app.schemas.shutdown_schedule</a>
  &#8226;   <a href="#app.services.obs_service">app.services.obs_service</a>
  &#8226;   <a href="#app.services.scheduler_service">app.services.scheduler_service</a>

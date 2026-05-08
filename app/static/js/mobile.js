@@ -58,7 +58,7 @@ function mobileApp() {
 
     configForm: {
         host: "",
-        port: 8080,
+        port: 8091,  // ✅ corrigido: era 8080
         token: ""
     }
 },
@@ -255,15 +255,15 @@ async holyLoadConfig() {
       const cfg = json.data;
 
       this.holy.config = {
-        host: cfg.host ?? this.holy.config.host,
-        port: cfg.port ?? this.holy.config.port,
-        token: cfg.token ?? this.holy.config.token,
-        is_configured: !!cfg.is_configured,
+        host: cfg.host || this.holy.config.host,
+        port: cfg.port || this.holy.config.port,
+        token: cfg.token || this.holy.config.token,
+        is_configured: cfg.is_configured ?? !!this.holy.config.token,
       };
 
       this.holy.configForm = {
         host: this.holy.config.host || "",
-        port: this.holy.config.port || 8080,
+        port: this.holy.config.port || 8091,  // ✅ corrigido: era 8080
         token: this.holy.config.token || "",
       };
 
@@ -281,7 +281,11 @@ async holyLoadConfig() {
         const res = await fetch('/api/holyrics/versions');
         const json = await res.json();
 
-        this.holy.versions = json.data?.versions || [];
+        // ✅ corrigido: aceita lista direta ou {versions: [...]}
+        const raw = json.data;
+        this.holy.versions = Array.isArray(raw)
+          ? raw
+          : (raw?.versions || []);
 
       } catch (e) {
         this.holy.versions = [];
@@ -294,9 +298,12 @@ async holyLoadConfig() {
         const res = await fetch('/api/holyrics/recent');
         const json = await res.json();
 
-        this.holy.recent = json.data?.items || [];
+        // ✅ corrigido: era json.data?.items — backend retorna lista direta
+        this.holy.recent = Array.isArray(json.data) ? json.data : [];
 
-      } catch (e) {}
+      } catch (e) {
+        this.holy.recent = [];
+      }
     },
 
     async holyRefreshStatus() {

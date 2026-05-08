@@ -552,10 +552,10 @@ async holyLoadConfig() {
   this._log('ANTES DE ATUALIZAR', this.holy.config);
 
   this.holy.config = {
-    host: cfg.host ?? this.holy.config.host,
-    port: cfg.port ?? this.holy.config.port,
-    token: cfg.token ?? this.holy.config.token,
-    is_configured: !!cfg.is_configured,
+    host: cfg.host || this.holy.config.host,
+    port: cfg.port || this.holy.config.port,
+    token: cfg.token || this.holy.config.token,
+    is_configured: cfg.is_configured ?? !!this.holy.config.token,
   };
 
   this._log('DEPOIS DE ATUALIZAR', this.holy.config);
