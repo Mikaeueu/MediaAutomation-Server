@@ -54,12 +54,13 @@ def save_config(data: Dict) -> None:
 
 
 def is_configured() -> bool:
-    """
-    Verifica se já existe configuração válida.
-    """
     data = load_config()
 
     if not data:
         return False
 
-    return bool(data.get("host") and data.get("port"))
+    return bool(
+        data.get("host")
+        and data.get("port")
+        and data.get("token")
+    )

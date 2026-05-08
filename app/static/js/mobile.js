@@ -8,6 +8,23 @@
  * @returns {object}
  */
 function mobileApp() {
+  const BOOK_NAMES_PT = {
+    Gen: 'Gênesis', Exod: 'Êxodo', Lev: 'Levítico', Num: 'Números', Deut: 'Deuteronômio',
+    Josh: 'Josué', Judg: 'Juízes', Ruth: 'Rute', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
+    '1Kgs': '1 Reis', '2Kgs': '2 Reis', '1Chr': '1 Crônicas', '2Chr': '2 Crônicas',
+    Ezra: 'Esdras', Neh: 'Neemias', Esth: 'Ester', Job: 'Jó', Ps: 'Salmos',
+    Prov: 'Provérbios', Eccl: 'Eclesiastes', Song: 'Cânticos', Isa: 'Isaías',
+    Jer: 'Jeremias', Lam: 'Lamentações', Ezek: 'Ezequiel', Dan: 'Daniel', Hos: 'Oséias',
+    Joel: 'Joel', Amos: 'Amós', Obad: 'Obadias', Jonah: 'Jonas', Mic: 'Miquéias',
+    Nah: 'Naum', Hab: 'Habacuque', Zeph: 'Sofonias', Hag: 'Ageu', Zech: 'Zacarias',
+    Mal: 'Malaquias', Matt: 'Mateus', Mark: 'Marcos', Luke: 'Lucas', John: 'João',
+    Acts: 'Atos', Rom: 'Romanos', '1Cor': '1 Coríntios', '2Cor': '2 Coríntios',
+    Gal: 'Gálatas', Eph: 'Efésios', Phil: 'Filipenses', Col: 'Colossenses',
+    '1Thess': '1 Tessalonicenses', '2Thess': '2 Tessalonicenses', '1Tim': '1 Timóteo',
+    '2Tim': '2 Timóteo', Titus: 'Tito', Phlm: 'Filemom', Heb: 'Hebreus', Jas: 'Tiago',
+    '1Pet': '1 Pedro', '2Pet': '2 Pedro', '1John': '1 João', '2John': '2 João',
+    '3John': '3 João', Jude: 'Judas', Rev: 'Apocalipse'
+  };
   const initial =
     (typeof window !== 'undefined' && window.__APP_INITIAL) || {};
   console.log('[MediaServer mobile] init com', initial);
@@ -34,6 +51,7 @@ function mobileApp() {
     },
 
     showConfig: false,
+    showBookPicker: false,
     showToken: false,
 
     versions: [],
@@ -48,17 +66,18 @@ function mobileApp() {
     error: "",
 
     form: {
-        version: "rc",
+        version: "",
         book: "",
         chapter: "",
         verse: ""
     },
 
     bookSearch: "",
+    selectedBookLabel: "",
 
     configForm: {
         host: "",
-        port: 8080,
+        port: 8091,  // ✅ corrigido: era 8080
         token: ""
     }
 },
@@ -227,6 +246,7 @@ function mobileApp() {
           id: i + 1,
           abbr: book.abbr,
           name: book.book,
+          name_pt: BOOK_NAMES_PT[book.abbr] || book.book,
           chapters: book.chapters
         }));
 
@@ -255,15 +275,15 @@ async holyLoadConfig() {
       const cfg = json.data;
 
       this.holy.config = {
-        host: cfg.host ?? this.holy.config.host,
-        port: cfg.port ?? this.holy.config.port,
-        token: cfg.token ?? this.holy.config.token,
-        is_configured: !!cfg.is_configured,
+        host: cfg.host || this.holy.config.host,
+        port: cfg.port || this.holy.config.port,
+        token: cfg.token || this.holy.config.token,
+        is_configured: cfg.is_configured ?? !!this.holy.config.token,
       };
 
       this.holy.configForm = {
         host: this.holy.config.host || "",
-        port: this.holy.config.port || 8080,
+        port: this.holy.config.port || 8091,  // ✅ corrigido: era 8080
         token: this.holy.config.token || "",
       };
 
@@ -281,7 +301,24 @@ async holyLoadConfig() {
         const res = await fetch('/api/holyrics/versions');
         const json = await res.json();
 
-        this.holy.versions = json.data?.versions || [];
+        // ✅ corrigido: aceita lista direta ou {versions: [...]}
+        const raw = json.data;
+        const list = Array.isArray(raw) ? raw : (raw?.versions || []);
+        this.holy.versions = list.map((v) => {
+          if (typeof v === 'string') return { abbrev: v, name: v };
+          return {
+            abbrev: v.key || v.abbrev || v.id || '',
+            name: v.title || v.name || v.key || '',
+          };
+        }).filter((v) => !!v.abbrev);
+
+        if (!this.holy.form.version || !this.holy.versions.some(v => v.abbrev === this.holy.form.version)) {
+          const arc = this.holy.versions.find(v => String(v.abbrev).toLowerCase() === 'pt_arc');
+          this.holy.form.version = arc ? arc.abbrev : (this.holy.versions[0]?.abbrev || '');
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'post-fix',hypothesisId:'H11',location:'app/static/js/mobile.js:holyLoadVersions',message:'mobile versions normalized',data:{count:this.holy.versions.length,sample:this.holy.versions.slice(0,5),currentFormVersion:this.holy.form.version},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
       } catch (e) {
         this.holy.versions = [];
@@ -294,17 +331,30 @@ async holyLoadConfig() {
         const res = await fetch('/api/holyrics/recent');
         const json = await res.json();
 
-        this.holy.recent = json.data?.items || [];
+        // ✅ corrigido: era json.data?.items — backend retorna lista direta
+        this.holy.recent = Array.isArray(json.data) ? json.data : [];
 
-      } catch (e) {}
+      } catch (e) {
+        this.holy.recent = [];
+      }
     },
 
     async holyRefreshStatus() {
       try {
         const res = await fetch('/api/holyrics/status');
         const json = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'post-fix',hypothesisId:'H5',location:'app/static/js/mobile.js:holyRefreshStatus',message:'mobile status raw response',data:{httpOk:res.ok,responseOk:!!json.ok,keys:Object.keys(json||{}),dataKeys:Object.keys((json&&json.data)||{}),nestedStatus:(json&&json.data&&json.data.status)||null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
-        this.holy.status = json.data || { connected: false };
+        const inner = json?.data?.data || {};
+        this.holy.status = {
+          ...inner,
+          connected: !!(res.ok && json?.ok && json?.data?.status === 'ok'),
+        };
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'post-fix',hypothesisId:'H5',location:'app/static/js/mobile.js:holyRefreshStatus',message:'mobile status assigned',data:{connectedAfterAssign:!!(this.holy.status&&this.holy.status.connected),statusShapeKeys:Object.keys(this.holy.status||{})},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
       } catch (e) {
         this.holy.status = { connected: false };
@@ -335,6 +385,9 @@ async holyLoadConfig() {
 
     async holySaveConfig() {
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H3',location:'app/static/js/mobile.js:holySaveConfig',message:'mobile save payload prepared',data:{host:this.holy.configForm.host,port:parseInt(this.holy.configForm.port,10),tokenLen:(this.holy.configForm.token||'').length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const res = await fetch('/api/holyrics/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -346,6 +399,9 @@ async holyLoadConfig() {
         });
 
         const json = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H3',location:'app/static/js/mobile.js:holySaveConfig',message:'mobile save response received',data:{httpOk:res.ok,responseOk:!!json.ok,hasData:!!json.data,responseTokenLen:((json.data&&json.data.token)||'').length,message:json.message||null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         if (json.ok) {
           this.holy.config = json.data;
@@ -389,6 +445,9 @@ async holyLoadConfig() {
         });
 
         const json = await res.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H8',location:'app/static/js/mobile.js:holyShowVerse',message:'mobile show verse response',data:{httpOk:res.ok,responseOk:!!json.ok,message:json.message||null,request:{version:f.version,book:f.book,chapter:parseInt(f.chapter,10),verse:parseInt(f.verse,10)}},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         if (res.ok && json.ok) {
           await this.holyLoadRecent();
@@ -426,11 +485,24 @@ async holyLoadConfig() {
         return;
       }
 
-      this.holy.filteredBooks = this.holy.books.filter(book =>
-        (book.name || '')
-            .toLowerCase()
-            .includes(q)
-      );
+      this.holy.filteredBooks = this.holy.books.filter(book => {
+        const byPt = (book.name_pt || '').toLowerCase().includes(q);
+        const byAbbr = (book.abbr || '').toLowerCase().includes(q);
+        return byPt || byAbbr;
+      });
+    },
+
+    openBookPicker() {
+      this.holy.showBookPicker = true;
+      this.holy.bookSearch = '';
+      this.holy.filteredBooks = [...this.holy.books];
+    },
+
+    selectBook(book) {
+      this.holy.form.book = book.abbr;
+      this.holy.selectedBookLabel = book.name_pt || book.name || book.abbr;
+      this.holy.showBookPicker = false;
+      this.updateChapters();
     },
 
     updateChapters() {
@@ -489,6 +561,12 @@ async holyLoadConfig() {
         chapter: item.chapter,
         verse: item.verse,
       };
+      const book = this.holy.books.find((b) => b.abbr === item.book);
+      this.holy.selectedBookLabel = (book && (book.name_pt || book.name)) || item.book;
+      this.updateChapters();
+      this.holy.form.chapter = item.chapter;
+      this.updateVerses();
+      this.holy.form.verse = item.verse;
       await this.holyShowVerse();
     },
 
