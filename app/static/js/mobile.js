@@ -8,6 +8,23 @@
  * @returns {object}
  */
 function mobileApp() {
+  const BOOK_NAMES_PT = {
+    Gen: 'Gênesis', Exod: 'Êxodo', Lev: 'Levítico', Num: 'Números', Deut: 'Deuteronômio',
+    Josh: 'Josué', Judg: 'Juízes', Ruth: 'Rute', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
+    '1Kgs': '1 Reis', '2Kgs': '2 Reis', '1Chr': '1 Crônicas', '2Chr': '2 Crônicas',
+    Ezra: 'Esdras', Neh: 'Neemias', Esth: 'Ester', Job: 'Jó', Ps: 'Salmos',
+    Prov: 'Provérbios', Eccl: 'Eclesiastes', Song: 'Cânticos', Isa: 'Isaías',
+    Jer: 'Jeremias', Lam: 'Lamentações', Ezek: 'Ezequiel', Dan: 'Daniel', Hos: 'Oséias',
+    Joel: 'Joel', Amos: 'Amós', Obad: 'Obadias', Jonah: 'Jonas', Mic: 'Miquéias',
+    Nah: 'Naum', Hab: 'Habacuque', Zeph: 'Sofonias', Hag: 'Ageu', Zech: 'Zacarias',
+    Mal: 'Malaquias', Matt: 'Mateus', Mark: 'Marcos', Luke: 'Lucas', John: 'João',
+    Acts: 'Atos', Rom: 'Romanos', '1Cor': '1 Coríntios', '2Cor': '2 Coríntios',
+    Gal: 'Gálatas', Eph: 'Efésios', Phil: 'Filipenses', Col: 'Colossenses',
+    '1Thess': '1 Tessalonicenses', '2Thess': '2 Tessalonicenses', '1Tim': '1 Timóteo',
+    '2Tim': '2 Timóteo', Titus: 'Tito', Phlm: 'Filemom', Heb: 'Hebreus', Jas: 'Tiago',
+    '1Pet': '1 Pedro', '2Pet': '2 Pedro', '1John': '1 João', '2John': '2 João',
+    '3John': '3 João', Jude: 'Judas', Rev: 'Apocalipse'
+  };
   const initial =
     (typeof window !== 'undefined' && window.__APP_INITIAL) || {};
   console.log('[MediaServer mobile] init com', initial);
@@ -34,6 +51,7 @@ function mobileApp() {
     },
 
     showConfig: false,
+    showBookPicker: false,
     showToken: false,
 
     versions: [],
@@ -55,6 +73,7 @@ function mobileApp() {
     },
 
     bookSearch: "",
+    selectedBookLabel: "",
 
     configForm: {
         host: "",
@@ -227,6 +246,7 @@ function mobileApp() {
           id: i + 1,
           abbr: book.abbr,
           name: book.book,
+          name_pt: BOOK_NAMES_PT[book.abbr] || book.book,
           chapters: book.chapters
         }));
 
@@ -465,11 +485,24 @@ async holyLoadConfig() {
         return;
       }
 
-      this.holy.filteredBooks = this.holy.books.filter(book =>
-        (book.name || '')
-            .toLowerCase()
-            .includes(q)
-      );
+      this.holy.filteredBooks = this.holy.books.filter(book => {
+        const byPt = (book.name_pt || '').toLowerCase().includes(q);
+        const byAbbr = (book.abbr || '').toLowerCase().includes(q);
+        return byPt || byAbbr;
+      });
+    },
+
+    openBookPicker() {
+      this.holy.showBookPicker = true;
+      this.holy.bookSearch = '';
+      this.holy.filteredBooks = [...this.holy.books];
+    },
+
+    selectBook(book) {
+      this.holy.form.book = book.abbr;
+      this.holy.selectedBookLabel = book.name_pt || book.name || book.abbr;
+      this.holy.showBookPicker = false;
+      this.updateChapters();
     },
 
     updateChapters() {
@@ -528,6 +561,12 @@ async holyLoadConfig() {
         chapter: item.chapter,
         verse: item.verse,
       };
+      const book = this.holy.books.find((b) => b.abbr === item.book);
+      this.holy.selectedBookLabel = (book && (book.name_pt || book.name)) || item.book;
+      this.updateChapters();
+      this.holy.form.chapter = item.chapter;
+      this.updateVerses();
+      this.holy.form.verse = item.verse;
       await this.holyShowVerse();
     },
 
