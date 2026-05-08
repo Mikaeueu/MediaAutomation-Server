@@ -518,6 +518,9 @@ function dashboard() {
 // ============================================================
 
 async holyActivate() {
+  // #region agent log
+  fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H1',location:'app/static/js/app.js:holyActivate',message:'holy activate helpers state',data:{hasLog:typeof this._log,hasFetch:typeof this._fetch,isConfigured:!!this.holy?.config?.is_configured},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   // só carrega se ainda não tiver carregado
   if (!this.holy._loaded) {
     await this.holyLoadConfig();
@@ -531,34 +534,31 @@ async holyActivate() {
 },
 
 async holyLoadConfig() {
-  this._log('HOLY LOAD CONFIG START');
+  // #region agent log
+  fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H1',location:'app/static/js/app.js:holyLoadConfig',message:'desktop holyLoadConfig entered',data:{hasLog:typeof this._log,hasFetch:typeof this._fetch},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  try {
+    const res = await fetch('/api/holyrics/config');
+    const data = await res.json().catch(() => ({}));
 
-  const { res, data } = await this._fetch('/api/holyrics/config');
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'post-fix',hypothesisId:'H1',location:'app/static/js/app.js:holyLoadConfig',message:'desktop holyLoadConfig response parsed',data:{httpOk:res.ok,responseOk:!!data.ok,hasData:!!data.data,tokenLen:((data.data&&data.data.token)||'').length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
-  this._log('HOLY RAW RESPONSE', data);
+    if (!res.ok || !data.ok || !data.data) return;
 
-  if (!res.ok) {
-    this._log('HOLY CONFIG ERRO HTTP');
-    return;
+    const cfg = data.data;
+    this.holy.config = {
+      host: cfg.host || this.holy.config.host,
+      port: cfg.port || this.holy.config.port,
+      token: cfg.token || '',
+      is_configured: cfg.is_configured ?? !!cfg.token,
+    };
+  } catch (e) {
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'post-fix',hypothesisId:'H1',location:'app/static/js/app.js:holyLoadConfig',message:'desktop holyLoadConfig caught error',data:{error:(e&&e.message)?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }
-
-  if (!data || !data.data) {
-    this._log('HOLY CONFIG VAZIO → NÃO VOU SOBRESCREVER');
-    return;
-  }
-
-  const cfg = data.data;
-
-  this._log('ANTES DE ATUALIZAR', this.holy.config);
-
-  this.holy.config = {
-    host: cfg.host || this.holy.config.host,
-    port: cfg.port || this.holy.config.port,
-    token: cfg.token || this.holy.config.token,
-    is_configured: cfg.is_configured ?? !!this.holy.config.token,
-  };
-
-  this._log('DEPOIS DE ATUALIZAR', this.holy.config);
 },
 
 async holyRefreshStatus() {
@@ -640,6 +640,9 @@ async holySaveConfig() {
     port: parseInt(this.holy.config.port, 10),
     token: this.holy.config.token || '',
   };
+  // #region agent log
+  fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H2',location:'app/static/js/app.js:holySaveConfig',message:'desktop save payload prepared',data:{host:payload.host,port:payload.port,tokenLen:(payload.token||'').length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const res = await fetch('/api/holyrics/config', {
     method: 'PUT',
@@ -648,6 +651,9 @@ async holySaveConfig() {
   });
 
   const data = await res.json().catch(() => ({}));
+  // #region agent log
+  fetch('http://127.0.0.1:7245/ingest/1fce3a10-75ca-4b7f-9ad6-a4d8c1e15bd8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'470fcb'},body:JSON.stringify({sessionId:'470fcb',runId:'initial',hypothesisId:'H2',location:'app/static/js/app.js:holySaveConfig',message:'desktop save response received',data:{httpOk:res.ok,responseOk:!!data.ok,hasData:!!data.data,responseTokenLen:((data.data&&data.data.token)||'').length,message:data.message||null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (res.ok && data.ok && data.data) {
     // 🔥 ATUALIZA O STATE COM O QUE VEIO DO BACKEND
