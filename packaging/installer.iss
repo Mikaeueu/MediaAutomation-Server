@@ -8,7 +8,7 @@
 ; Saida: packaging/output/MediaAutomationServer-Setup-X.Y.Z.exe
 
 #define AppName "MediaAutomationServer"
-#define AppVersion "0.7.2"
+#define AppVersion "0.7.10"
 #define AppPublisher "Sua Igreja"
 #define AppExeName "MediaAutomationServer.exe"
 
@@ -25,7 +25,10 @@ OutputBaseFilename={#AppName}-Setup-{#AppVersion}
 Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
+; Requer admin (UAC) pra instalar em C:\Program Files [(x86)].
+; {autopf} resolve automaticamente: 64-bit -> "Program Files",
+; 32-bit -> "Program Files (x86)".
+PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ; MinVersion: omitido. Inno Setup 6 ja requer Win 7+ por padrao;
 ; verificacao de "Win 10 ou superior" pode ser adicionada via [Code]

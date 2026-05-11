@@ -97,6 +97,18 @@ function mobileApp() {
     _obsPollId: null,
     _volumeDebounce: null,
 
+    // ---------- Letras (Holyrics songs do banco local) ----------
+    songs: {
+      status: null,        // {found, data_dir, db_path, cached}
+      query: '',
+      results: [],
+      selected: null,      // {id, title, author, slides:[]}
+      activeSlide: 0,
+      loading: false,
+      error: '',
+      manualPath: '',
+    },
+
     // ============================================================
     //  Bootstrap
     // ============================================================
@@ -554,6 +566,47 @@ async holyLoadConfig() {
     /**
      * Repete um verso do histórico (preenche form e mostra).
      */
+    /**
+     * Verifica se ha verso anterior disponivel no capitulo atual.
+     * @returns {boolean}
+     */
+    holyHasPrev() {
+      const v = parseInt(this.holy.form.verse, 10);
+      const list = this.holy.availableVerses || [];
+      if (!v || list.length === 0) return false;
+      return v > Math.min(...list);
+    },
+
+    /**
+     * Verifica se ha proximo verso disponivel no capitulo atual.
+     * @returns {boolean}
+     */
+    holyHasNext() {
+      const v = parseInt(this.holy.form.verse, 10);
+      const list = this.holy.availableVerses || [];
+      if (!v || list.length === 0) return false;
+      return v < Math.max(...list);
+    },
+
+    /**
+     * Volta um verso e ja projeta automaticamente.
+     */
+    async holyPrevVerse() {
+      if (!this.holyHasPrev()) return;
+      this.holy.form.verse = parseInt(this.holy.form.verse, 10) - 1;
+      await this.holyShowVerse();
+    },
+
+    /**
+     * Avanca um verso e ja projeta automaticamente.
+     * Limitado pelo ultimo verso do capitulo (botao fica desabilitado).
+     */
+    async holyNextVerse() {
+      if (!this.holyHasNext()) return;
+      this.holy.form.verse = parseInt(this.holy.form.verse, 10) + 1;
+      await this.holyShowVerse();
+    },
+
     async holyRepeat(item) {
       this.holy.form = {
         version: item.version,
@@ -681,6 +734,136 @@ async holyLoadConfig() {
     async logout() {
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login';
+    },
+
+    // ============================================================
+    //  Letras (Holyrics songs do banco SQLite local)
+    // ============================================================
+
+    async songsInit() {
+      // Carrega status da API do Holyrics e ja faz uma busca vazia.
+      await this.songsRefreshStatus();
+      if (this.songs.status && this.songs.status.ok) {
+        await this.songsSearch();
+      }
+    },
+
+    async songsRefreshStatus() {
+      try {
+        const res = await fetch('/api/holyrics/songs/status');
+        const j = await res.json();
+        if (j.ok) {
+          this.songs.status = j.data;
+        }
+      } catch (e) {
+        this.songs.error = 'Falha ao consultar servidor';
+      }
+    },
+
+    async songsSearch() {
+      this.songs.loading = true;
+      this.songs.error = '';
+      try {
+        const url = '/api/holyrics/songs/search?q=' +
+          encodeURIComponent(this.songs.query || '');
+        const res = await fetch(url);
+        const j = await res.json();
+        if (j.ok) {
+          this.songs.results = j.data || [];
+        } else {
+          this.songs.results = [];
+          this.songs.error = j.message || 'Falha na busca';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      } finally {
+        this.songs.loading = false;
+      }
+    },
+
+    async songsOpen(song) {
+      try {
+        const res = await fetch(`/api/holyrics/songs/${encodeURIComponent(song.id)}/slides`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao abrir hino';
+          return;
+        }
+        const j = await res.json();
+        this.songs.selected = j.data;
+        this.songs.activeSlide = 0;
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    songsBack() {
+      this.songs.selected = null;
+      this.songs.activeSlide = 0;
+      this.songs.error = '';
+    },
+
+    async songsProject() {
+      if (!this.songs.selected) return;
+      this.songs.error = '';
+      try {
+        const res = await fetch(
+          `/api/holyrics/songs/${encodeURIComponent(this.songs.selected.id)}/show`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao projetar';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    songsPrev() {
+      if (this.songs.activeSlide > 0) {
+        this.songsShowSlide(this.songs.activeSlide - 1);
+      }
+    },
+
+    songsNext() {
+      if (this.songs.selected &&
+          this.songs.activeSlide < this.songs.selected.slides.length - 1) {
+        this.songsShowSlide(this.songs.activeSlide + 1);
+      }
+    },
+
+    async songsShowSlide(idx) {
+      // Marca slide ativo na UI e projeta o slide via initial_index.
+      if (!this.songs.selected) return;
+      this.songs.activeSlide = idx;
+      this.songs.error = '';
+      try {
+        const sid = encodeURIComponent(this.songs.selected.id);
+        const res = await fetch(
+          `/api/holyrics/songs/${sid}/show-slide/${idx}`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao projetar slide';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    async songsClose() {
+      this.songs.error = '';
+      try {
+        const res = await fetch('/api/holyrics/songs/close', { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao esconder';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
     },
   };
 }
