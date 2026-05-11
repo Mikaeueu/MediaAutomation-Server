@@ -36,7 +36,7 @@
         <template x-for="st in serviceTypes" :key="st.id"><button @click="generate(st.id)" :class="selectedId === st.id ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30' : 'border-slate-800 hover:border-slate-600 bg-slate-900/60'" class="text-left border rounded-xl p-4 transition"><p class="font-medium" x-text="st.name"></p><p class="text-xs text-slate-400 mt-1 line-clamp-2" x-text="st.title_template"></p><p x-show="st.suggested_weekday !== null" x-cloak class="text-xs text-brand-400 mt-2" x-text="'Sugerido: ' + weekdayName(st.suggested_weekday)"></p></button></template>
         <div x-show="serviceTypes.length === 0" x-cloak class="col-span-full bg-slate-900/60 border border-dashed border-slate-700 rounded-xl p-8 text-center text-slate-400">Nenhum tipo de culto cadastrado. <button @click="activeTab = 'types'" class="text-brand-400 hover:underline ml-1">Cadastrar agora</button></div>
       </div>
-      <div x-show="generated" x-cloak class="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
+      <div x-show="generated && generated.title" x-cloak class="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
 
   <!-- TÍTULO -->
   <div>

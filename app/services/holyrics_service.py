@@ -264,6 +264,18 @@ class HolyricsService:
         # #endregion
         return versions
 
+    async def action_next(self) -> dict:
+        """Avanca pro proximo slide da projecao atual (leve, nao reprojeta)."""
+        return await self._post("ActionNext")
+
+    async def action_previous(self) -> dict:
+        """Volta pro slide anterior da projecao atual (leve, nao reprojeta)."""
+        return await self._post("ActionPrevious")
+
+    async def action_go_to_index(self, index: int) -> dict:
+        """Pula direto pra um slide especifico (leve, nao reprojeta)."""
+        return await self._post("ActionGoToIndex", {"index": int(index)})
+
     async def get_chapter_verses(
         self, version: str, book: str, chapter: int
     ) -> list[dict]:

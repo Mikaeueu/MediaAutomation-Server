@@ -342,6 +342,39 @@ async def close_verse():
 # ============================================================
 
 
+@router.post("/action/next", response_model=DefaultResponse)
+async def action_next():
+    """Avanca pro proximo slide (comando leve, nao reprojeta nada)."""
+    try:
+        service = HolyricsService()
+        await service.action_next()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
+@router.post("/action/previous", response_model=DefaultResponse)
+async def action_previous():
+    """Volta pro slide anterior (comando leve, nao reprojeta nada)."""
+    try:
+        service = HolyricsService()
+        await service.action_previous()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
+@router.post("/action/goto", response_model=DefaultResponse)
+async def action_goto(index: int):
+    """Pula pra slide especifico por indice (comando leve)."""
+    try:
+        service = HolyricsService()
+        await service.action_go_to_index(index)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
 @router.get("/chapter", response_model=DefaultResponse)
 async def get_chapter(version: str, book: str, chapter: int):
     """Lista versiculos de um capitulo (texto se a API retornar).

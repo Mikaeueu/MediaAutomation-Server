@@ -84,6 +84,10 @@ function mobileApp() {
     bookSearch: "",
     selectedBookLabel: "",
 
+    // O que esta atualmente projetado no Holyrics (pra decidir entre
+    // ShowVerse novo ou ActionGoToIndex leve no mesmo capitulo).
+    lastProjected: { book: null, chapter: null },
+
     configForm: {
         host: "",
         port: 8091,  // ✅ corrigido: era 8080
@@ -124,10 +128,39 @@ function mobileApp() {
 
     async init() {
       await this.obsRefresh();
-      this._obsPollId = setInterval(() => this.obsRefresh(), 5000);
+      this._startPolling();
 
+      // Page Visibility: pausa polling quando aba/celular trava ou minimiza,
+      // pra nao acumular fetches pendentes. Quando volta, refresca uma vez
+      // e retoma. Eh o que evita o "F5 conserta" depois de horas aberto.
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this._stopPolling();
+        } else {
+          // Atualiza imediato ao retomar
+          this.obsRefresh();
+          this._checkUpcomingShutdown();
+          this._startPolling();
+        }
+      });
+    },
+
+    _startPolling() {
+      // Garante que nao tem polling duplicado.
+      this._stopPolling();
+      this._obsPollId = setInterval(() => this.obsRefresh(), 5000);
       this._shutdownPollId = setInterval(() => this._checkUpcomingShutdown(), 30 * 1000);
       this._checkUpcomingShutdown();
+    },
+
+    _stopPolling() {
+      if (this._obsPollId) { clearInterval(this._obsPollId); this._obsPollId = null; }
+      if (this._shutdownPollId) { clearInterval(this._shutdownPollId); this._shutdownPollId = null; }
+      // Aborta requisicoes pendentes pra nao acumular.
+      if (this._inFlightAbort) {
+        try { this._inFlightAbort.abort(); } catch (e) {}
+        this._inFlightAbort = null;
+      }
     },
 
     // ============================================================
@@ -135,10 +168,22 @@ function mobileApp() {
     // ============================================================
 
     async obsRefresh() {
+      // Cancela refresh anterior se ainda nao terminou (evita acumular).
+      if (this._inFlightAbort) {
+        try { this._inFlightAbort.abort(); } catch (e) {}
+      }
+      const ctrl = new AbortController();
+      this._inFlightAbort = ctrl;
+      // Timeout duro de 4s pra nao ficar pendurado.
+      const timeoutId = setTimeout(() => ctrl.abort(), 4000);
       try {
-        const res = await fetch('/api/obs/status');
+        const res = await fetch('/api/obs/status', { signal: ctrl.signal });
         if (res.ok) this.obsStatus = await res.json();
-      } catch (e) { /* offline */ }
+      } catch (e) { /* offline ou abortado */ }
+      finally {
+        clearTimeout(timeoutId);
+        if (this._inFlightAbort === ctrl) this._inFlightAbort = null;
+      }
 
       if (this.obsStatus.connected) {
         await this.obsLoadScenes();
@@ -471,6 +516,12 @@ async holyLoadConfig() {
         // #endregion
 
         if (res.ok && json.ok) {
+          // Marca o capitulo projetado pra decidir entre ShowVerse e
+          // ActionGoToIndex nos cliques seguintes.
+          this.holy.lastProjected = {
+            book: f.book,
+            chapter: parseInt(f.chapter, 10),
+          };
           await this.holyLoadRecent();
         } else {
           this.holy.error = json.message || 'Falha ao mostrar versículo';
@@ -485,6 +536,8 @@ async holyLoadConfig() {
       try {
         const res = await fetch('/api/holyrics/close', { method: 'POST' });
         const json = await res.json();
+        // Limpa rastreio pra forcar ShowVerse na proxima projecao.
+        this.holy.lastProjected = { book: null, chapter: null };
 
         if (!json.ok) {
           this.holy.error = json.message || 'Falha ao esconder';
@@ -599,6 +652,21 @@ async holyLoadConfig() {
 
     async holyShowVerseByNumber(verseNumber) {
       this.holy.form.verse = verseNumber;
+      const f = this.holy.form;
+      const sameChapter =
+        this.holy.lastProjected.book === f.book &&
+        this.holy.lastProjected.chapter === parseInt(f.chapter, 10);
+      // Se ja temos projecao do mesmo capitulo, ActionGoToIndex (leve).
+      // Caso contrario (capitulo/livro diferente ou nada projetado),
+      // ShowVerse pra iniciar.
+      if (sameChapter) {
+        try {
+          await fetch(`/api/holyrics/action/goto?index=${verseNumber - 1}`, {
+            method: 'POST',
+          });
+          return;
+        } catch (e) { /* cai pra ShowVerse */ }
+      }
       await this.holyShowVerse();
     },
 
@@ -690,7 +758,9 @@ async holyLoadConfig() {
     async holyPrevVerse() {
       if (!this.holyHasPrev()) return;
       this.holy.form.verse = parseInt(this.holy.form.verse, 10) - 1;
-      await this.holyShowVerse();
+      // ActionPrevious eh leve (nao reprojeta).
+      try { await fetch('/api/holyrics/action/previous', { method: 'POST' }); }
+      catch (e) { /* silent */ }
     },
 
     /**
@@ -700,7 +770,8 @@ async holyLoadConfig() {
     async holyNextVerse() {
       if (!this.holyHasNext()) return;
       this.holy.form.verse = parseInt(this.holy.form.verse, 10) + 1;
-      await this.holyShowVerse();
+      try { await fetch('/api/holyrics/action/next', { method: 'POST' }); }
+      catch (e) { /* silent */ }
     },
 
     async holyRepeat(item) {
@@ -916,34 +987,29 @@ async holyLoadConfig() {
       }
     },
 
-    songsPrev() {
-      if (this.songs.activeSlide > 0) {
-        this.songsShowSlide(this.songs.activeSlide - 1);
-      }
+    async songsPrev() {
+      if (this.songs.activeSlide > 0) this.songs.activeSlide -= 1;
+      try { await fetch('/api/holyrics/action/previous', { method: 'POST' }); }
+      catch (e) { /* silent */ }
     },
 
-    songsNext() {
+    async songsNext() {
       if (this.songs.selected &&
           this.songs.activeSlide < this.songs.selected.slides.length - 1) {
-        this.songsShowSlide(this.songs.activeSlide + 1);
+        this.songs.activeSlide += 1;
       }
+      try { await fetch('/api/holyrics/action/next', { method: 'POST' }); }
+      catch (e) { /* silent */ }
     },
 
     async songsShowSlide(idx) {
-      // Marca slide ativo na UI e projeta o slide via initial_index.
       if (!this.songs.selected) return;
       this.songs.activeSlide = idx;
       this.songs.error = '';
       try {
-        const sid = encodeURIComponent(this.songs.selected.id);
-        const res = await fetch(
-          `/api/holyrics/songs/${sid}/show-slide/${idx}`,
-          { method: 'POST' }
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.songs.error = err.detail || 'Falha ao projetar slide';
-        }
+        await fetch(`/api/holyrics/action/goto?index=${idx + 1}`, {
+          method: 'POST'
+        });
       } catch (e) {
         this.songs.error = String(e);
       }
@@ -958,119 +1024,6 @@ async holyLoadConfig() {
           this.songs.error = err.detail || 'Falha ao esconder';
         }
       } catch (e) {
-        this.songs.error = String(e);
-      }
-    },
-  };
-}
-
-    async songsSearch() {
-      this.songs.loading = true;
-      this.songs.error = '';
-      try {
-        const url = '/api/holyrics/songs/search?q=' +
-          encodeURIComponent(this.songs.query || '');
-        const res = await fetch(url);
-        const j = await res.json();
-        if (j.ok) {
-          this.songs.results = j.data || [];
-        } else {
-          this.songs.results = [];
-          this.songs.error = j.message || 'Falha na busca';
-        }
-      } catch (e) {
-        this.songs.error = String(e);
-      } finally {
-        this.songs.loading = false;
-      }
-    },
-
-    async songsOpen(song) {
-      try {
-        const res = await fetch(`/api/holyrics/songs/${encodeURIComponent(song.id)}/slides`);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.songs.error = err.detail || 'Falha ao abrir hino';
-          return;
-        }
-        const j = await res.json();
-        this.songs.selected = j.data;
-        this.songs.activeSlide = 0;
-      } catch (e) {
-        this.songs.error = String(e);
-      }
-    },
-
-    songsBack() {
-      this.songs.selected = null;
-      this.songs.activeSlide = 0;
-      this.songs.error = '';
-    },
-
-    async songsProject() {
-      if (!this.songs.selected) return;
-      this.songs.error = '';
-      try {
-        const res = await fetch(
-          `/api/holyrics/songs/${encodeURIComponent(this.songs.selected.id)}/show`,
-          { method: 'POST' }
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.songs.error = err.detail || 'Falha ao projetar';
-        }
-      } catch (e) {
-        this.songs.error = String(e);
-      }
-    },
-
-    songsPrev() {
-      if (this.songs.activeSlide > 0) {
-        this.songsShowSlide(this.songs.activeSlide - 1);
-      }
-    },
-
-    songsNext() {
-      if (this.songs.selected &&
-          this.songs.activeSlide < this.songs.selected.slides.length - 1) {
-        this.songsShowSlide(this.songs.activeSlide + 1);
-      }
-    },
-
-    async songsShowSlide(idx) {
-      if (!this.songs.selected) return;
-      this.songs.activeSlide = idx;
-      this.songs.error = '';
-      try {
-        const sid = encodeURIComponent(this.songs.selected.id);
-        const res = await fetch(
-          `/api/holyrics/songs/${sid}/show-slide/${idx}`,
-          { method: 'POST' }
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.songs.error = err.detail || 'Falha ao projetar slide';
-        }
-      } catch (e) {
-        this.songs.error = String(e);
-      }
-    },
-
-    async songsClose() {
-      this.songs.error = '';
-      try {
-        const res = await fetch('/api/holyrics/songs/close', { method: 'POST' });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.songs.error = err.detail || 'Falha ao esconder';
-        }
-      } catch (e) {
-        this.songs.error = String(e);
-      }
-    },
-  };
-}
-(e) {
         this.songs.error = String(e);
       }
     },

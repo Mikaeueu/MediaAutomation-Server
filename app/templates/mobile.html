@@ -437,6 +437,28 @@ endblock %} {% block body %}
         </button>
       </div>
 
+      <!-- Setas de navegacao entre versiculos (ActionPrevious/Next, leves) -->
+      <div
+        x-show="holy.config.is_configured && holy.form.verse"
+        x-cloak
+        class="grid grid-cols-2 gap-2"
+      >
+        <button
+          @click="holyPrevVerse()"
+          :disabled="!holyHasPrev()"
+          class="bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+        >
+          ◀
+        </button>
+        <button
+          @click="holyNextVerse()"
+          :disabled="!holyHasNext()"
+          class="bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+        >
+          ▶
+        </button>
+      </div>
+
       <!-- Botao esconder -->
       <button
         x-show="holy.config.is_configured"
@@ -901,5 +923,5 @@ endblock %} {% block body %}
     display: none !important;
   }
 </style>
-<script src="/static/js/mobile.js"></script>
-{% endblock %}
+<script src="/static/js/mobile.js?v=0.7.17"></script>
+  {% endblock %}
