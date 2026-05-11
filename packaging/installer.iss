@@ -8,7 +8,7 @@
 ; Saida: packaging/output/MediaAutomationServer-Setup-X.Y.Z.exe
 
 #define AppName "MediaAutomationServer"
-#define AppVersion "0.7.10"
+#define AppVersion "0.7.12"
 #define AppPublisher "Sua Igreja"
 #define AppExeName "MediaAutomationServer.exe"
 

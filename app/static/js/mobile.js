@@ -61,6 +61,15 @@ function mobileApp() {
     availableChapters: [],
     availableVerses: [],
 
+    // novos pickers
+    showChapterPicker: false,
+    showVersePicker: false,
+    chapterSearch: "",
+    verseSearch: "",
+    filteredChapters: [],
+    filteredVerses: [],
+    chapterVerses: [],   // [{verse, text}] vindo de /api/holyrics/chapter
+
     recent: [],
 
     error: "",
@@ -514,7 +523,94 @@ async holyLoadConfig() {
       this.holy.form.book = book.abbr;
       this.holy.selectedBookLabel = book.name_pt || book.name || book.abbr;
       this.holy.showBookPicker = false;
+      this.holy.chapterVerses = [];
       this.updateChapters();
+      // Abre direto o picker de capitulo pra fluidez.
+      this.openChapterPicker();
+    },
+
+    openChapterPicker() {
+      this.updateChapters();
+      this.holy.chapterSearch = '';
+      this.holy.filteredChapters = [...this.holy.availableChapters];
+      this.holy.showChapterPicker = true;
+    },
+
+    filterChapters() {
+      const q = (this.holy.chapterSearch || '').trim();
+      if (!q) {
+        this.holy.filteredChapters = [...this.holy.availableChapters];
+        return;
+      }
+      this.holy.filteredChapters = this.holy.availableChapters.filter(
+        c => String(c).startsWith(q)
+      );
+    },
+
+    selectChapter(ch) {
+      this.holy.form.chapter = ch;
+      this.holy.showChapterPicker = false;
+      this.holy.chapterVerses = [];
+      this.updateVerses();
+      // Abre direto picker de versiculo.
+      this.openVersePicker();
+    },
+
+    openVersePicker() {
+      this.updateVerses();
+      this.holy.verseSearch = '';
+      this.holy.filteredVerses = [...this.holy.availableVerses];
+      this.holy.showVersePicker = true;
+    },
+
+    filterVerses() {
+      const q = (this.holy.verseSearch || '').trim();
+      if (!q) {
+        this.holy.filteredVerses = [...this.holy.availableVerses];
+        return;
+      }
+      this.holy.filteredVerses = this.holy.availableVerses.filter(
+        v => String(v).startsWith(q)
+      );
+    },
+
+    async selectVerse(vs) {
+      this.holy.form.verse = vs;
+      this.holy.showVersePicker = false;
+      // Carrega lista completa do capitulo pra exibir na tela.
+      await this.loadChapterVerses();
+    },
+
+    async loadChapterVerses() {
+      if (!this.holy.form.book || !this.holy.form.chapter) return;
+      try {
+        const url = `/api/holyrics/chapter?version=${encodeURIComponent(this.holy.form.version || 'rc')}` +
+                    `&book=${encodeURIComponent(this.holy.form.book)}` +
+                    `&chapter=${encodeURIComponent(this.holy.form.chapter)}`;
+        const res = await fetch(url);
+        const j = await res.json();
+        if (j.ok && j.data && Array.isArray(j.data.verses)) {
+          this.holy.chapterVerses = j.data.verses;
+        }
+      } catch (e) {
+        // silencioso — fica sem a lista de texto.
+      }
+    },
+
+    async holyShowVerseByNumber(verseNumber) {
+      this.holy.form.verse = verseNumber;
+      await this.holyShowVerse();
+    },
+
+    /**
+     * Reconstroi o label em pt-BR a partir dos campos do recent.
+     * Backend salva book como abbr (ex: "Gen"); aqui resolvemos via BOOK_NAMES_PT.
+     */
+    holyRecentLabel(r) {
+      if (!r) return '';
+      const ptName = BOOK_NAMES_PT[r.book] || r.book;
+      const ver = (r.version || '').toUpperCase().replace('PT_', '');
+      return `${ptName} ${r.chapter}:${r.verse}` + (ver ? ` (${ver})` : '');
     },
 
     updateChapters() {
@@ -862,6 +958,119 @@ async holyLoadConfig() {
           this.songs.error = err.detail || 'Falha ao esconder';
         }
       } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+  };
+}
+
+    async songsSearch() {
+      this.songs.loading = true;
+      this.songs.error = '';
+      try {
+        const url = '/api/holyrics/songs/search?q=' +
+          encodeURIComponent(this.songs.query || '');
+        const res = await fetch(url);
+        const j = await res.json();
+        if (j.ok) {
+          this.songs.results = j.data || [];
+        } else {
+          this.songs.results = [];
+          this.songs.error = j.message || 'Falha na busca';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      } finally {
+        this.songs.loading = false;
+      }
+    },
+
+    async songsOpen(song) {
+      try {
+        const res = await fetch(`/api/holyrics/songs/${encodeURIComponent(song.id)}/slides`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao abrir hino';
+          return;
+        }
+        const j = await res.json();
+        this.songs.selected = j.data;
+        this.songs.activeSlide = 0;
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    songsBack() {
+      this.songs.selected = null;
+      this.songs.activeSlide = 0;
+      this.songs.error = '';
+    },
+
+    async songsProject() {
+      if (!this.songs.selected) return;
+      this.songs.error = '';
+      try {
+        const res = await fetch(
+          `/api/holyrics/songs/${encodeURIComponent(this.songs.selected.id)}/show`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao projetar';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    songsPrev() {
+      if (this.songs.activeSlide > 0) {
+        this.songsShowSlide(this.songs.activeSlide - 1);
+      }
+    },
+
+    songsNext() {
+      if (this.songs.selected &&
+          this.songs.activeSlide < this.songs.selected.slides.length - 1) {
+        this.songsShowSlide(this.songs.activeSlide + 1);
+      }
+    },
+
+    async songsShowSlide(idx) {
+      if (!this.songs.selected) return;
+      this.songs.activeSlide = idx;
+      this.songs.error = '';
+      try {
+        const sid = encodeURIComponent(this.songs.selected.id);
+        const res = await fetch(
+          `/api/holyrics/songs/${sid}/show-slide/${idx}`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao projetar slide';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+
+    async songsClose() {
+      this.songs.error = '';
+      try {
+        const res = await fetch('/api/holyrics/songs/close', { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.songs.error = err.detail || 'Falha ao esconder';
+        }
+      } catch (e) {
+        this.songs.error = String(e);
+      }
+    },
+  };
+}
+(e) {
         this.songs.error = String(e);
       }
     },

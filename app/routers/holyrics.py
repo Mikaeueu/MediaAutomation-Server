@@ -342,6 +342,43 @@ async def close_verse():
 # ============================================================
 
 
+@router.get("/chapter", response_model=DefaultResponse)
+async def get_chapter(version: str, book: str, chapter: int):
+    """Lista versiculos de um capitulo (texto se a API retornar).
+
+    Sempre retorna a estrutura completa baseado em BIBLE_META, mesmo
+    que a API nao devolva texto — preenche com strings vazias e a UI
+    mostra so o numero.
+    """
+    book_meta = find_book_meta(book)
+    if not book_meta:
+        return {"ok": False, "message": f"Livro '{book}' nao encontrado."}
+    chapter_meta = next(
+        (c for c in book_meta["chapters"] if str(c["chapter"]) == str(chapter)),
+        None,
+    )
+    if not chapter_meta:
+        return {"ok": False, "message": f"Capitulo {chapter} invalido."}
+    max_verse = int(chapter_meta["verses"])
+
+    # Tenta buscar texto via API. Se falhar, retorna so numeros.
+    try:
+        service = HolyricsService()
+        api_verses = await service.get_chapter_verses(version, book, int(chapter))
+    except Exception:
+        api_verses = []
+
+    text_by_verse = {v["verse"]: v["text"] for v in api_verses}
+    verses = [
+        {"verse": n, "text": text_by_verse.get(n, "")}
+        for n in range(1, max_verse + 1)
+    ]
+    return {
+        "ok": True,
+        "data": {"book": book, "chapter": int(chapter), "verses": verses},
+    }
+
+
 @router.get("/recent", response_model=DefaultResponse)
 def list_recent():
     # Retorna os últimos 10 em ordem decrescente (mais recente primeiro)

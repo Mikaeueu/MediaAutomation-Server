@@ -394,41 +394,32 @@ endblock %} {% block body %}
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <select
-              x-model="holy.form.chapter"
-              @change="updateVerses()"
-              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            <label class="text-xs text-slate-400 uppercase tracking-wide">Capítulo</label>
+            <button
+              type="button"
+              @click="openChapterPicker()"
+              :disabled="!holy.form.book"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 mt-1 text-left disabled:opacity-50"
             >
-              <option value="">Capítulo</option>
-              <template x-for="chapter in holy.availableChapters" :key="chapter">
-                <option :value="chapter" x-text="chapter"></option>
-              </template>
-            </select>
+              <span
+                x-text="holy.form.chapter || 'Escolher'"
+                :class="holy.form.chapter ? 'text-slate-100' : 'text-slate-500'"
+              ></span>
+            </button>
           </div>
-          <div class="flex gap-1">
+          <div>
+            <label class="text-xs text-slate-400 uppercase tracking-wide">Versículo</label>
             <button
               type="button"
-              @click="holyPrevVerse"
-              :disabled="!holyHasPrev()"
-              class="w-12 shrink-0 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700 rounded-lg flex items-center justify-center font-bold text-lg"
-              title="Verso anterior"
-            >&lt;</button>
-            <select
-              x-model="holy.form.verse"
-              class="flex-1 min-w-0 rounded-lg bg-slate-900 border border-slate-700 p-3"
+              @click="openVersePicker()"
+              :disabled="!holy.form.chapter"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 mt-1 text-left disabled:opacity-50"
             >
-              <option value="">Versículo</option>
-              <template x-for="verse in holy.availableVerses" :key="verse">
-                <option :value="verse" x-text="verse"></option>
-              </template>
-            </select>
-            <button
-              type="button"
-              @click="holyNextVerse"
-              :disabled="!holyHasNext()"
-              class="w-12 shrink-0 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700 rounded-lg flex items-center justify-center font-bold text-lg"
-              title="Próximo verso"
-            >&gt;</button>
+              <span
+                x-text="holy.form.verse || 'Escolher'"
+                :class="holy.form.verse ? 'text-slate-100' : 'text-slate-500'"
+              ></span>
+            </button>
           </div>
         </div>
         <p
@@ -468,7 +459,7 @@ endblock %} {% block body %}
             @click="holyRepeat(r)"
             class="w-full text-left bg-slate-900/60 hover:bg-slate-800 active:scale-[0.98] border border-slate-800 rounded-lg px-4 py-2.5 transition"
           >
-            <p class="text-sm font-medium truncate" x-text="r.label"></p>
+            <p class="text-sm font-medium truncate" x-text="holyRecentLabel(r)"></p>
           </button>
         </template>
       </div>
@@ -725,6 +716,97 @@ endblock %} {% block body %}
 
     <!-- (volta pra aba versos pros modais que ja existiam) -->
     <section x-show="tab === 'verses'" x-cloak class="space-y-3">
+      <!-- Modal de selecao de CAPITULO -->
+      <div
+        x-show="holy.showChapterPicker"
+        x-cloak
+        class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">Capítulo de <span x-text="holy.selectedBookLabel"></span></h3>
+            <button @click="holy.showChapterPicker = false" class="text-xs text-slate-400">Fechar</button>
+          </div>
+          <input
+            type="number"
+            inputmode="numeric"
+            x-model="holy.chapterSearch"
+            @input="filterChapters()"
+            placeholder="Digite o capítulo..."
+            class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-base"
+          />
+          <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-700 grid grid-cols-5 gap-1 p-1">
+            <template x-for="ch in holy.filteredChapters" :key="ch">
+              <button
+                type="button"
+                @click="selectChapter(ch)"
+                class="bg-slate-800 hover:bg-brand-500 active:scale-95 rounded px-2 py-3 text-sm font-mono"
+                x-text="ch"
+              ></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de selecao de VERSICULO -->
+      <div
+        x-show="holy.showVersePicker"
+        x-cloak
+        class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">
+              Versículo de <span x-text="holy.selectedBookLabel"></span> <span x-text="holy.form.chapter"></span>
+            </h3>
+            <button @click="holy.showVersePicker = false" class="text-xs text-slate-400">Fechar</button>
+          </div>
+          <input
+            type="number"
+            inputmode="numeric"
+            x-model="holy.verseSearch"
+            @input="filterVerses()"
+            placeholder="Digite o versículo..."
+            class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-base"
+          />
+          <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-700 grid grid-cols-5 gap-1 p-1">
+            <template x-for="vs in holy.filteredVerses" :key="vs">
+              <button
+                type="button"
+                @click="selectVerse(vs)"
+                class="bg-slate-800 hover:bg-brand-500 active:scale-95 rounded px-2 py-3 text-sm font-mono"
+                x-text="vs"
+              ></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de TODOS os versiculos do capitulo (apos selecionar) -->
+      <div
+        x-show="holy.config.is_configured && holy.chapterVerses.length > 0"
+        x-cloak
+        class="space-y-2"
+      >
+        <p class="text-xs text-slate-400 uppercase tracking-wide">
+          <span x-text="holy.selectedBookLabel"></span> <span x-text="holy.form.chapter"></span> — toque para projetar
+        </p>
+        <template x-for="v in holy.chapterVerses" :key="v.verse">
+          <div
+            @click="holyShowVerseByNumber(v.verse)"
+            :class="parseInt(holy.form.verse) === v.verse ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30' : 'border-slate-800 bg-slate-900/60'"
+            class="border rounded-xl p-3 cursor-pointer transition flex gap-3"
+          >
+            <span class="text-xs text-brand-400 font-mono shrink-0 mt-0.5" x-text="v.verse"></span>
+            <span
+              class="text-sm leading-relaxed min-w-0 break-words"
+              :class="v.text ? 'text-slate-100' : 'text-slate-500 italic'"
+              x-text="v.text || '(toque para projetar)'"
+            ></span>
+          </div>
+        </template>
+      </div>
+
       <!-- Modal de seleção de livro -->
       <div
         x-show="holy.showBookPicker"
