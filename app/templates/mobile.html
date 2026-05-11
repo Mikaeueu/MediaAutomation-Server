@@ -147,6 +147,27 @@ endblock %} {% block body %}
         </svg>
         Versos
       </button>
+      <button
+        @click="tab = 'songs'; songsInit()"
+        :class="tab === 'songs' ? 'bg-brand-500/20 text-brand-50' : 'text-slate-400'"
+        class="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.8"
+          stroke="currentColor"
+          class="w-4 h-4"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66A2.25 2.25 0 0019.5 12.553V6.75M9 9v10.5a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 16.553V9z"
+          />
+        </svg>
+        Letras
+      </button>
     </nav>
 
     <!-- ===================== Aba Cenas ===================== -->
@@ -373,27 +394,32 @@ endblock %} {% block body %}
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <select
-              x-model="holy.form.chapter"
-              @change="updateVerses()"
-              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            <label class="text-xs text-slate-400 uppercase tracking-wide">Capítulo</label>
+            <button
+              type="button"
+              @click="openChapterPicker()"
+              :disabled="!holy.form.book"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 mt-1 text-left disabled:opacity-50"
             >
-              <option value="">Capítulo</option>
-              <template x-for="chapter in holy.availableChapters" :key="chapter">
-                <option :value="chapter" x-text="chapter"></option>
-              </template>
-            </select>
+              <span
+                x-text="holy.form.chapter || 'Escolher'"
+                :class="holy.form.chapter ? 'text-slate-100' : 'text-slate-500'"
+              ></span>
+            </button>
           </div>
           <div>
-            <select
-              x-model="holy.form.verse"
-              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+            <label class="text-xs text-slate-400 uppercase tracking-wide">Versículo</label>
+            <button
+              type="button"
+              @click="openVersePicker()"
+              :disabled="!holy.form.chapter"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 mt-1 text-left disabled:opacity-50"
             >
-              <option value="">Versículo</option>
-              <template x-for="verse in holy.availableVerses" :key="verse">
-                <option :value="verse" x-text="verse"></option>
-              </template>
-            </select>
+              <span
+                x-text="holy.form.verse || 'Escolher'"
+                :class="holy.form.verse ? 'text-slate-100' : 'text-slate-500'"
+              ></span>
+            </button>
           </div>
         </div>
         <p
@@ -408,6 +434,28 @@ endblock %} {% block body %}
           class="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition rounded-lg py-3 font-semibold text-white"
         >
           Mostrar no Holyrics
+        </button>
+      </div>
+
+      <!-- Setas de navegacao entre versiculos (ActionPrevious/Next, leves) -->
+      <div
+        x-show="holy.config.is_configured && holy.form.verse"
+        x-cloak
+        class="grid grid-cols-2 gap-2"
+      >
+        <button
+          @click="holyPrevVerse()"
+          :disabled="!holyHasPrev()"
+          class="bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+        >
+          ◀
+        </button>
+        <button
+          @click="holyNextVerse()"
+          :disabled="!holyHasNext()"
+          class="bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+        >
+          ▶
         </button>
       </div>
 
@@ -433,7 +481,7 @@ endblock %} {% block body %}
             @click="holyRepeat(r)"
             class="w-full text-left bg-slate-900/60 hover:bg-slate-800 active:scale-[0.98] border border-slate-800 rounded-lg px-4 py-2.5 transition"
           >
-            <p class="text-sm font-medium truncate" x-text="r.label"></p>
+            <p class="text-sm font-medium truncate" x-text="holyRecentLabel(r)"></p>
           </button>
         </template>
       </div>
@@ -521,6 +569,264 @@ endblock %} {% block body %}
             Fechar
           </button>
         </div>
+      </div>
+
+      <!-- placeholder -->
+    </section>
+
+    <!-- ===================== Aba Letras (Hinos) ===================== -->
+    <section x-show="tab === 'songs'" x-cloak class="space-y-3">
+      <!-- Banner se Holyrics nao conectado -->
+      <div
+        x-show="songs.status && !songs.status.ok"
+        x-cloak
+        class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center space-y-1"
+      >
+        <p class="text-sm font-medium text-amber-400">
+          Holyrics nao conectado
+        </p>
+        <p class="text-xs text-slate-400" x-text="songs.status.message || 'Verifique a aba Versos > Configurar.'"></p>
+      </div>
+
+      <!-- Lista de busca -->
+      <div
+        x-show="songs.status && songs.status.ok && !songs.selected"
+        x-cloak
+        class="space-y-3"
+      >
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>Busca de hinos no Holyrics</span>
+          <button @click="songsInit()" class="shrink-0 ml-2 text-slate-500">
+            Atualizar
+          </button>
+        </div>
+        <input
+          type="text"
+          x-model="songs.query"
+          @input.debounce.300ms="songsSearch()"
+          placeholder="Digite o nome do hino..."
+          class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3"
+        />
+        <p
+          x-show="songs.error"
+          x-cloak
+          x-text="songs.error"
+          class="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5"
+        ></p>
+        <div class="space-y-2">
+          <template x-for="s in songs.results" :key="s.id">
+            <button
+              @click="songsOpen(s)"
+              class="w-full text-left bg-slate-900/60 hover:bg-slate-800 active:scale-[0.98] border border-slate-800 rounded-lg px-4 py-3 transition"
+            >
+              <p class="text-sm font-semibold truncate" x-text="s.title"></p>
+              <p
+                x-show="s.author"
+                class="text-xs text-slate-500 truncate"
+                x-text="s.author"
+              ></p>
+            </button>
+          </template>
+          <p
+            x-show="songs.query && songs.results.length === 0 && !songs.loading"
+            x-cloak
+            class="text-sm text-slate-500 text-center py-6"
+          >
+            Nenhum hino encontrado.
+          </p>
+        </div>
+      </div>
+
+      <!-- Hino selecionado: lista de slides -->
+      <div
+        x-show="songs.selected"
+        x-cloak
+        class="space-y-3"
+      >
+        <div class="flex items-center gap-2">
+          <button
+            @click="songsBack()"
+            class="shrink-0 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+          >
+            ← Voltar
+          </button>
+          <div class="min-w-0 flex-1">
+            <p
+              class="font-semibold truncate"
+              x-text="songs.selected ? songs.selected.title : ''"
+            ></p>
+            <p
+              x-show="songs.selected && songs.selected.author"
+              class="text-xs text-slate-500 truncate"
+              x-text="songs.selected ? songs.selected.author : ''"
+            ></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            @click="songsProject()"
+            class="bg-brand-500 hover:bg-brand-600 active:scale-[0.98] transition rounded-xl py-3 font-semibold text-white shadow-lg"
+          >
+            Projetar hino
+          </button>
+          <button
+            @click="songsClose()"
+            class="bg-red-500 hover:bg-red-600 active:scale-[0.98] transition rounded-xl py-3 font-semibold text-white shadow-lg"
+          >
+            Esconder
+          </button>
+        </div>
+        <p
+          x-show="songs.error"
+          x-cloak
+          x-text="songs.error"
+          class="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5"
+        ></p>
+
+        <!-- Lista de slides com letra completa visivel -->
+        <div class="space-y-2">
+          <template
+            x-for="(slide, idx) in (songs.selected ? songs.selected.slides : [])"
+            :key="idx"
+          >
+            <div
+              @click="songsShowSlide(idx)"
+              :class="songs.activeSlide === idx ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30' : 'border-slate-800 bg-slate-900/60'"
+              class="border rounded-xl p-4 cursor-pointer transition"
+            >
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <span class="text-xs text-slate-500 font-mono"
+                  >Slide <span x-text="idx + 1"></span></span
+                >
+                <span
+                  x-show="songs.activeSlide === idx"
+                  x-cloak
+                  class="text-[10px] bg-brand-500 text-white px-2 py-0.5 rounded-full font-bold"
+                  >ATIVO</span
+                >
+              </div>
+              <p
+                class="text-sm whitespace-pre-line leading-relaxed"
+                x-text="slide"
+              ></p>
+            </div>
+          </template>
+        </div>
+
+        <!-- Navegacao entre slides -->
+        <div
+          class="sticky bottom-0 -mx-4 px-4 py-3 bg-slate-950/95 backdrop-blur border-t border-slate-800 flex gap-2"
+        >
+          <button
+            @click="songsPrev()"
+            :disabled="songs.activeSlide <= 0"
+            class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+          >
+            ◀
+          </button>
+          <button
+            @click="songsNext()"
+            :disabled="!songs.selected || songs.activeSlide >= songs.selected.slides.length - 1"
+            class="flex-1 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 border border-slate-700 rounded-lg py-3 font-bold text-lg"
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- (volta pra aba versos pros modais que ja existiam) -->
+    <section x-show="tab === 'verses'" x-cloak class="space-y-3">
+      <!-- Modal de selecao de CAPITULO -->
+      <div
+        x-show="holy.showChapterPicker"
+        x-cloak
+        class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">Capítulo de <span x-text="holy.selectedBookLabel"></span></h3>
+            <button @click="holy.showChapterPicker = false" class="text-xs text-slate-400">Fechar</button>
+          </div>
+          <input
+            type="number"
+            inputmode="numeric"
+            x-model="holy.chapterSearch"
+            @input="filterChapters()"
+            placeholder="Digite o capítulo..."
+            class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-base"
+          />
+          <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-700 grid grid-cols-5 gap-1 p-1">
+            <template x-for="ch in holy.filteredChapters" :key="ch">
+              <button
+                type="button"
+                @click="selectChapter(ch)"
+                class="bg-slate-800 hover:bg-brand-500 active:scale-95 rounded px-2 py-3 text-sm font-mono"
+                x-text="ch"
+              ></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de selecao de VERSICULO -->
+      <div
+        x-show="holy.showVersePicker"
+        x-cloak
+        class="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold">
+              Versículo de <span x-text="holy.selectedBookLabel"></span> <span x-text="holy.form.chapter"></span>
+            </h3>
+            <button @click="holy.showVersePicker = false" class="text-xs text-slate-400">Fechar</button>
+          </div>
+          <input
+            type="number"
+            inputmode="numeric"
+            x-model="holy.verseSearch"
+            @input="filterVerses()"
+            placeholder="Digite o versículo..."
+            class="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-base"
+          />
+          <div class="max-h-72 overflow-y-auto rounded-lg border border-slate-700 grid grid-cols-5 gap-1 p-1">
+            <template x-for="vs in holy.filteredVerses" :key="vs">
+              <button
+                type="button"
+                @click="selectVerse(vs)"
+                class="bg-slate-800 hover:bg-brand-500 active:scale-95 rounded px-2 py-3 text-sm font-mono"
+                x-text="vs"
+              ></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de TODOS os versiculos do capitulo (apos selecionar) -->
+      <div
+        x-show="holy.config.is_configured && holy.chapterVerses.length > 0"
+        x-cloak
+        class="space-y-2"
+      >
+        <p class="text-xs text-slate-400 uppercase tracking-wide">
+          <span x-text="holy.selectedBookLabel"></span> <span x-text="holy.form.chapter"></span> — toque para projetar
+        </p>
+        <template x-for="v in holy.chapterVerses" :key="v.verse">
+          <div
+            @click="holyShowVerseByNumber(v.verse)"
+            :class="parseInt(holy.form.verse) === v.verse ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30' : 'border-slate-800 bg-slate-900/60'"
+            class="border rounded-xl p-3 cursor-pointer transition flex gap-3"
+          >
+            <span class="text-xs text-brand-400 font-mono shrink-0 mt-0.5" x-text="v.verse"></span>
+            <span
+              class="text-sm leading-relaxed min-w-0 break-words"
+              :class="v.text ? 'text-slate-100' : 'text-slate-500 italic'"
+              x-text="v.text || '(toque para projetar)'"
+            ></span>
+          </div>
+        </template>
       </div>
 
       <!-- Modal de seleção de livro -->
@@ -617,5 +923,5 @@ endblock %} {% block body %}
     display: none !important;
   }
 </style>
-<script src="/static/js/mobile.js"></script>
-{% endblock %}
+<script src="/static/js/mobile.js?v=0.7.17"></script>
+  {% endblock %}

@@ -18,6 +18,7 @@ from app.database import init_database
 from app.routers import (
     auth,
     holyrics,
+    holyrics_songs,
     live_generator,
     network,
     obs,
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
     application.include_router(shutdown.router)
     application.include_router(obs.router)
     application.include_router(holyrics.router)
+    application.include_router(holyrics_songs.router)
 
     return application
 

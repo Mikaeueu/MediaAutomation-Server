@@ -18,7 +18,7 @@ function dashboard() {
     // ---------- Service Types ----------
     serviceTypes: [],
     selectedId: null,
-    generated: null,
+    generated: { title: '', description: '' },
     copiedField: '',
 
     // ---------- Network info (preenchido via SSR) ----------
@@ -160,7 +160,7 @@ function dashboard() {
       const res = await fetch(`/api/service-types/${id}`, { method: 'DELETE' });
       if (res.ok) {
         if (this.selectedId === id) {
-          this.generated = null;
+          this.generated = { title: '', description: '' };
           this.selectedId = null;
         }
         await this.loadTypes();

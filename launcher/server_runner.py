@@ -1,24 +1,28 @@
-"""Gerencia o subprocess do servidor uvicorn.
+"""Gerencia o servidor uvicorn rodando IN-PROCESS via thread.
 
-Encapsula start/stop do uvicorn pra que o launcher trate o servidor como
-um servico controlavel sem precisar lidar com subprocess no GUI thread.
+Antes usavamos ``subprocess.Popen`` que re-executava o proprio exe em
+``--server-mode``. Mas isso quebrava no PyInstaller frozen mode (subprocess
+crashava antes de qualquer print), sem dar pra debugar.
+
+Agora rodamos ``uvicorn.Server`` direto numa thread daemon, no mesmo
+processo do launcher Qt. Vantagens:
+  * sem subprocess - sem chance de quebrar em sys.executable;
+  * logs vao direto pro stderr do launcher (visiveis no log);
+  * shutdown gracioso via ``server.should_exit = True``;
+  * tracebacks aparecem completos.
 """
 
+from __future__ import annotations
+
 import os
-import signal
-import subprocess
-import sys
 import threading
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 
 
 class ServerRunner:
-    """Controla o ciclo de vida do servidor uvicorn como subprocess.
-
-    Use ``start()`` e ``stop()`` para gerenciar. Eventos ``on_log`` e
-    ``on_state_change`` permitem o GUI reagir em tempo real.
-    """
+    """Controla o ciclo de vida do uvicorn rodando in-process."""
 
     STATE_STOPPED = "stopped"
     STATE_STARTING = "starting"
@@ -42,16 +46,17 @@ class ServerRunner:
         self._project_root = Path(project_root).resolve()
         self._host = host
         self._port = port
-        self._process: subprocess.Popen | None = None
-        self._reader_thread: threading.Thread | None = None
+        self._server = None  # uvicorn.Server lazy
+        self._thread: threading.Thread | None = None
         self._state = self.STATE_STOPPED
         self._on_log: Callable[[str], None] | None = None
         self._on_state_change: Callable[[str], None] | None = None
+        self._chdir_done = False
 
     # ---------------------- Eventos ----------------------
 
     def set_log_handler(self, handler: Callable[[str], None]) -> None:
-        """Registra um callback que recebe cada linha de log do uvicorn."""
+        """Registra um callback que recebe cada linha de log."""
         self._on_log = handler
 
     def set_state_handler(self, handler: Callable[[str], None]) -> None:
@@ -62,13 +67,13 @@ class ServerRunner:
 
     @property
     def state(self) -> str:
-        """Estado atual do servidor (stopped/starting/running/stopping/error)."""
+        """Estado atual (stopped/starting/running/stopping/error)."""
         return self._state
 
     @property
     def is_running(self) -> bool:
-        """Indica se ha um processo ativo."""
-        return self._process is not None and self._process.poll() is None
+        """Indica se a thread do uvicorn esta ativa."""
+        return self._thread is not None and self._thread.is_alive()
 
     @property
     def host(self) -> str:
@@ -81,124 +86,124 @@ class ServerRunner:
         return self._port
 
     def start(self) -> None:
-        """Inicia o servidor uvicorn em subprocess."""
+        """Inicia o uvicorn em uma thread daemon."""
         if self.is_running:
             return
         self._set_state(self.STATE_STARTING)
+        self._emit_log(f"[runner] iniciando uvicorn em {self._host}:{self._port}")
 
-        cmd = self._build_command()
-        env = os.environ.copy()
-        # Desabilita buffering pra logs aparecerem em tempo real.
-        env["PYTHONUNBUFFERED"] = "1"
+        # chdir uma vez, pra Jinja2Templates(directory='app/templates') achar.
+        if not self._chdir_done:
+            try:
+                os.chdir(self._project_root)
+                self._chdir_done = True
+                self._emit_log(f"[runner] cwd = {os.getcwd()}")
+            except Exception as exc:  # noqa: BLE001
+                self._emit_log(f"[runner] aviso: chdir falhou: {exc}")
 
-        creationflags = 0
-        if sys.platform.startswith("win"):
-            # Esconde a janela do console no Windows.
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-        try:
-            self._process = subprocess.Popen(
-                cmd,
-                cwd=str(self._project_root),
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                creationflags=creationflags,
-                bufsize=1,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-        except FileNotFoundError as exc:
-            self._emit_log(f"[erro] {exc}")
-            self._set_state(self.STATE_ERROR)
-            return
-
-        # Lê stdout em thread pra nao bloquear o GUI.
-        self._reader_thread = threading.Thread(
-            target=self._read_output, daemon=True, name="server-log-reader"
+        self._thread = threading.Thread(
+            target=self._run_uvicorn,
+            name="uvicorn-server",
+            daemon=True,
         )
-        self._reader_thread.start()
+        self._thread.start()
 
-        # Aguarda alguns instantes em outra thread pra confirmar startup.
-        threading.Thread(target=self._wait_running, daemon=True).start()
+        # Marca como RUNNING apos pequena espera (em outra thread, pra nao
+        # bloquear o GUI).
+        threading.Thread(target=self._mark_running, daemon=True).start()
 
     def stop(self, timeout: float = 5.0) -> None:
-        """Para o servidor de forma graciosa, com fallback para kill."""
-        if not self.is_running:
+        """Para o servidor de forma graciosa via ``server.should_exit``."""
+        if not self.is_running or self._server is None:
+            self._set_state(self.STATE_STOPPED)
             return
         self._set_state(self.STATE_STOPPING)
+        self._emit_log("[runner] solicitando shutdown gracioso...")
+        try:
+            self._server.should_exit = True
+        except Exception:  # noqa: BLE001
+            pass
+        if self._thread is not None:
+            self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                self._emit_log("[runner] timeout no shutdown - thread daemon morrera com o processo")
+        self._thread = None
+        self._server = None
+        self._set_state(self.STATE_STOPPED)
+
+    # ---------------------- Internos ----------------------
+
+    def _crash_log(self, msg: str) -> None:
+        """Grava msg num arquivo persistente (independente da UI thread)."""
+        try:
+            base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+            p = Path(base) / "MediaAutomationServer"
+            p.mkdir(parents=True, exist_ok=True)
+            with open(p / "server-crash.log", "a", encoding="utf-8") as fp:
+                fp.write(msg + "\n")
+        except Exception:
+            pass
+
+    def _run_uvicorn(self) -> None:
+        """Carrega ``app.main:app`` e roda ``uvicorn.Server.run()`` aqui."""
+        # Limpa crash log anterior pra so ter o mais recente.
+        try:
+            base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+            (Path(base) / "MediaAutomationServer" / "server-crash.log").unlink(
+                missing_ok=True
+            )
+        except Exception:
+            pass
+
+        self._crash_log("=== run_uvicorn START ===")
+        self._crash_log(f"cwd={os.getcwd()}")
 
         try:
-            if sys.platform.startswith("win"):
-                # CTRL+BREAK seria ideal, mas como criamos sem console,
-                # vamos direto pro terminate.
-                self._process.terminate()
-            else:
-                self._process.send_signal(signal.SIGTERM)
-            self._process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            self._emit_log("[warn] timeout ao parar, forcando kill...")
-            self._process.kill()
-            self._process.wait()
-        finally:
-            self._process = None
-            self._set_state(self.STATE_STOPPED)
+            self._crash_log("step: import uvicorn")
+            import uvicorn  # noqa: PLC0415
+            self._crash_log("step: import uvicorn OK")
 
-    # ---------------------- Helpers internos ----------------------
+            self._crash_log("step: from app.main import app")
+            from app.main import app  # noqa: PLC0415
+            self._crash_log("step: from app.main import app OK")
 
-    def _build_command(self) -> list[str]:
-        """Monta o comando do subprocess de acordo com o ambiente.
-
-        Em modo **frozen** (empacotado pelo PyInstaller), ``sys.executable``
-        aponta pro proprio launcher .exe. Chamar ele com ``-m uvicorn``
-        nao funciona (PyInstaller nao expoe modulos via -m). Em vez disso,
-        chamamos o proprio exe com a flag ``--server-mode``, que faz o
-        ``launcher.main`` iniciar apenas o uvicorn (sem GUI).
-
-        Em modo dev (rodando via ``python -m launcher.main``), usamos o
-        Python do .venv com ``-m uvicorn`` direto.
-
-        Returns:
-            Lista de argumentos pro ``subprocess.Popen``.
-        """
-        if getattr(sys, "frozen", False):
-            # Mesmo exe, modo server: re-executa em --server-mode.
-            return [
-                sys.executable,
-                "--server-mode",
-                "--host", self._host,
-                "--port", str(self._port),
-            ]
-
-        venv = self._project_root / ".venv" / "Scripts" / "python.exe"
-        python = str(venv) if venv.exists() else sys.executable
-        return [
-            python,
-            "-m", "uvicorn",
-            "app.main:app",
-            "--host", self._host,
-            "--port", str(self._port),
-        ]
-
-    def _read_output(self) -> None:
-        """Le stdout do subprocess linha a linha e emite via callback."""
-        if self._process is None or self._process.stdout is None:
+            self._crash_log("step: uvicorn.Config")
+            # log_config=None: uvicorn nao tenta criar handlers de logging
+            # que dependem de sys.stdout/stderr (que sao None quando o exe
+            # e empacotado com console=False).
+            config = uvicorn.Config(
+                app,
+                host=self._host,
+                port=self._port,
+                log_level="info",
+                access_log=False,
+                log_config=None,
+            )
+            self._crash_log("step: uvicorn.Server")
+            self._server = uvicorn.Server(config)
+            self._emit_log("[runner] uvicorn.Server.run() iniciando event loop...")
+            self._crash_log("step: server.run()")
+            self._server.run()
+            self._crash_log("step: server.run() retornou")
+            self._emit_log("[runner] uvicorn encerrou normalmente")
+        except Exception as exc:  # noqa: BLE001
+            tb = traceback.format_exc()
+            msg = f"[runner] CRASH: {type(exc).__name__}: {exc}\n{tb}"
+            self._emit_log(msg)
+            self._crash_log(msg)
+            self._set_state(self.STATE_ERROR)
             return
-        for line in self._process.stdout:
-            self._emit_log(line.rstrip())
-        # Quando o stream fecha, o processo encerrou.
+        # Quando uvicorn sai sem exception, marca como STOPPED.
         if self._state in (self.STATE_RUNNING, self.STATE_STARTING):
             self._set_state(self.STATE_STOPPED)
-            self._process = None
 
-    def _wait_running(self) -> None:
-        """Confirma que o servidor subiu (heuristica: 2.5s sem cair)."""
+    def _mark_running(self) -> None:
+        """Marca como RUNNING se a thread sobreviver os primeiros 2s."""
         import time
-
-        time.sleep(2.5)
+        time.sleep(2.0)
         if self.is_running and self._state == self.STATE_STARTING:
             self._set_state(self.STATE_RUNNING)
+            self._emit_log("[runner] servidor confirmado RUNNING")
 
     def _emit_log(self, line: str) -> None:
         """Emite uma linha de log pelo callback se houver."""

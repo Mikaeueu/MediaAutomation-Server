@@ -264,6 +264,66 @@ class HolyricsService:
         # #endregion
         return versions
 
+    async def action_next(self) -> dict:
+        """Avanca pro proximo slide da projecao atual (leve, nao reprojeta)."""
+        return await self._post("ActionNext")
+
+    async def action_previous(self) -> dict:
+        """Volta pro slide anterior da projecao atual (leve, nao reprojeta)."""
+        return await self._post("ActionPrevious")
+
+    async def action_go_to_index(self, index: int) -> dict:
+        """Pula direto pra um slide especifico (leve, nao reprojeta)."""
+        return await self._post("ActionGoToIndex", {"index": int(index)})
+
+    async def get_chapter_verses(
+        self, version: str, book: str, chapter: int
+    ) -> list[dict]:
+        """Tenta buscar texto de todos os versiculos de um capitulo.
+
+        A API do Holyrics nao expoe um endpoint padronizado pra ler
+        Biblia (so projetar). Tentamos varios nomes/payloads conhecidos
+        e fazemos fallback graceful: se nada funcionar, retorna lista
+        vazia (a UI cai pra modo "so numeros").
+
+        Returns:
+            Lista de ``{"verse": int, "text": str}``. ``text`` pode
+            estar vazio se a API nao retornou.
+        """
+        version_raw = (version or "").strip()
+        version_lower = version_raw.lower()
+        if version_lower in {"rc", "arc", "pt_arc"}:
+            version_key = "pt_arc"
+        else:
+            version_key = version_raw
+
+        attempts = [
+            ("GetBibleVerses", {"version": version_key, "book": book, "chapter": chapter}),
+            ("GetBibleChapter", {"version": version_key, "book": book, "chapter": chapter}),
+            ("GetVerse", {"version": version_key, "book": book, "chapter": chapter}),
+        ]
+        for method, payload in attempts:
+            try:
+                resp = await self._post(method, payload)
+                raw = resp.get("data") or resp.get("verses") or []
+                verses: list[dict] = []
+                if isinstance(raw, list):
+                    for i, item in enumerate(raw, start=1):
+                        if isinstance(item, str):
+                            verses.append({"verse": i, "text": item})
+                        elif isinstance(item, dict):
+                            verses.append({
+                                "verse": int(item.get("verse") or item.get("number") or i),
+                                "text": item.get("text") or item.get("content") or "",
+                            })
+                if verses:
+                    return verses
+            except HolyricsError:
+                continue
+            except Exception:
+                continue
+        return []
+
     async def get_status(self) -> dict:
         """Verifica se o Holyrics está online e retorna info do CP."""
         try:
